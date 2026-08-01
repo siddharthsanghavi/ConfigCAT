@@ -1,0 +1,23 @@
+{
+  "name": "sids-ethercat-configurator",
+  "private": true,
+  "version": "0.2.0",
+  "description": "Offline single-file web app for building and wiring Beckhoff EtherCAT stations and multi-vendor control panels.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "jspdf": "^4.2.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.0",
+    "vite": "^5.4.0",
+    "vite-plugin-singlefile": "^2.3.3"
+  }
+}
