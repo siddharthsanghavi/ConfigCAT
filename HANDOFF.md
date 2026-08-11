@@ -34,9 +34,17 @@ cp dist/index.html Sids-EtherCAT-Configurator.html
 ```
 - `npm` does **not** work via the portable dist here (npm.cmd missing /
   npm-cli.js misbehaves). Install deps only if `node_modules` is missing.
+- As of 2026-08-10 this repo has **no `node_modules` of its own** — it is a
+  directory junction to `Documents\Claude\Beckhoff\node_modules` (same
+  dependency set, gitignored), created with
+  `cmd /c mklink /J <repo>\node_modules <that path>`. Recreate it if the
+  build cannot find vite. A surviving portable Node from an earlier session
+  was at `…\bb0d9880-…\scratchpad\node-v22.12.0-win-x64\node.exe`.
 - Dev server: `.claude/launch.json` points at the portable node + vite.
   Its `runtimeExecutable` path contains the **session-specific scratchpad
-  id** — it will be stale in a new session and must be updated.
+  id** — it will be stale in a new session and must be updated. The entry
+  actually used by the preview tool lives in the **primary working
+  directory's** `.claude/launch.json`, not this repo's.
 - `vite-plugin-singlefile` inlines everything; `base: "./"` so `file://`
   works.
 
@@ -170,11 +178,74 @@ has caught real "ports outside the body" bugs).
   coupler/CX-fed segment before the end cover; threaded `TerminalG →
   ElFace` as `powered`, which gates `ledStates`. Couplers/PSUs keep their
   own LEDs. Diagram's `TerminalG` uses the `powered=true` default.
-- **EtherCAT Topology (2026-07-25)**: `TopologyModal` (before `DiagramSvg`)
-  — master node + one row per coupler-headed segment (split at end covers),
-  linked master→station→station; free EtherCAT devices
-  (epbox/iol/iolhub/drive/linaxis) as dashed-linked field nodes. Node
-  colour = `FN[d.fn].c`. Exports PNG via the SVG-serialise pattern.
+- **Palette tree (2026-08-11)**: the palette is company → category → part
+  (`palTree` in App.jsx), not the flat `GROUPS` list it used to render.
+  `GROUPS` is now the *category source*: whichever group a part is listed
+  in (or auto-filed into by kind) becomes its subfolder, relabelled via
+  `CAT_LABEL`, canonicalised via `CAT_CANON` (`drv3`→`drv`, `psu`→`pwr`)
+  and ordered by `CAT_ORDER`. Companies come from `d.brand`, Beckhoff
+  pinned first. `openGroups` now keys both companies (`"beckhoff"`) and
+  subfolders (`"beckhoff/cplr"`). A company with a single category renders
+  its parts without the extra subfolder click, and a search or
+  manufacturer pick force-expands matches. Because curated and imported
+  parts share the company folders, `catalog.js` no longer needs per-vendor
+  GROUPS entries — that also fixed generic `box` parts with `fn: "net"`
+  (gateways, media converters) filing into Switching & Protection.
+- **ETG directory import (2026-08-11)**: `src/catalog-etg.js` is generated
+  by `scripts/gen-etg.py` from `scripts/ethercat_products.csv` (ETG product
+  directory, 1423 rows) — **never hand-edit it**; change the script and
+  rerun. 893 parts + 259 vendor wordmarks. The generated data dictates no
+  layout at all: `etg` holds the plain-language device type ("Servo
+  drive"), which marks the part as a directory import (the **SRC** filter
+  is `!d.etg` / `d.etg`) and is matched by the palette search along with
+  the manufacturer name. Not imported:
+  MainDevices (215), dev tools (214), training (40), passive connectors
+  (50), safety dev kits (11) — none have connection points. Every entry
+  reuses an existing `kind` (drive / linaxis / epbox / sensor / box /
+  switch8 / panel / valvebank) so nothing draws as a placeholder. The CSV
+  mixes part numbers with family names; `slug_id` keeps a token with
+  letters+digits as the part number, else flags `family: true` and slugs
+  the phrase. Fixed alongside: the `drive`, `ipc` and `panel` faces
+  hardcoded a **BECKHOFF** wordmark, so every third-party part using them
+  (KOLLMORGEN-AKD, OMRON-1S… and now 365 imported drives) was drawn with
+  Beckhoff branding — they now use `brand.name` / `brandColor`, lifted
+  toward white via `brandOnDark` on dark housings.
+- **Project library (2026-08-10)**: `doc.name` is now part of the document
+  (`sanitizeDoc` defaults it to `Untitled station`); renaming goes through
+  `setDoc`, not `update()`, so it stays out of the undo stack. `LIB_KEY`
+  holds a `{id: {id, name, savedAt, doc}}` map of named saves — each entry
+  is re-sanitised on read so one corrupt entry cannot take out the list.
+  `ProjectsModal` does save / open / update / rename / delete; file Save
+  writes `<slug(name)>.json` with `app`/`version`/`name`/`savedAt`, and
+  Import reports what `sanitizeDoc` dropped via `droppedBy` (gotcha 5 is
+  now visible to the user instead of silent). Note `showFlash` only
+  rendered inside the wire bar — there is now a `S.toast` fallback for
+  flashes raised outside wire mode.
+- **EtherCAT Topology (2026-08-10)**: `TopologyModal` (before `DiagramSvg`)
+  — redrawn to match the TwinCAT online topology: one box per slave in a
+  single top-down chain, labelled `Term n (ID)` (n = auto-increment
+  position), ports A in / B out / C branch drawn only on devices with real
+  RJ45 sockets (`coupler`/`cx`/`ext`/`junction`). Links are port-to-port
+  verticals — blue inside a station (E-bus), green between stations (RJ45
+  hop). Coupler-headed segments (split at end covers) become dashed
+  station frames; free EtherCAT devices (epbox/iol/iolhub/drive/linaxis)
+  drop off the last junction's port C into a second column, or off the
+  master (dashed) if there is no junction. Node colour = `FN[d.fn].c`.
+  Exports PNG via the SVG-serialise pattern.
+  *Was:* one horizontal row per station — the station→station link used a
+  non-existent `row.y`, so the hop rendered as a `NaN` path (invisible).
+  **E-bus continuity (same day):** a link is drawn only where the terminals
+  physically touch. The chain breaks at an end cover, at `inst.gap > 0`
+  (gapped groups are not in contact), at a `psu` device (a PSU brick has no
+  E-bus contacts) and at the next coupler/CX. Anything outside a
+  coupler-headed run — including devices stranded behind a PSU or a gap, and
+  junctions like EK1122 which cannot head a station — is listed unlinked in
+  a red-dashed **“Not on the E-bus”** block instead of being drawn into the
+  chain (previously such devices were silently omitted).
+  ⚠ `validate.js` does not yet agree: it splits stations at end covers only,
+  filters PSUs out of `ebusItems` as if they were transparent, and ignores
+  `gap`. So the topology can show a device off-network while the validator
+  stays quiet. Align `validateStation` when you next touch it.
 - **New parts (2026-07-25)**: CU8110-0120 / CU8130-0120 (UPS, kind
   supplybox), C9900-U330 (external UPS), CX2900-0192 (battery, kind box),
   CU8210-M001 (dome, kind box) — filed into pwr/net GROUPS explicitly.

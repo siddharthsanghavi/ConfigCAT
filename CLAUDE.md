@@ -8,7 +8,7 @@ selection, validate, and export BOM / diagram / XML.
 state. `FEATURES.md` lists every feature plus the roadmap.
 
 ## Deliverable
-`Sids-EtherCAT-Configurator.html` (in `beckhoff/`) — ~1.1 MB,
+`Sids-EtherCAT-Configurator.html` (repo root) — ~1.65 MB,
 self-contained, double-click to run offline. Rebuild after any change:
 ```bash
 node node_modules/vite/bin/vite.js build
@@ -18,7 +18,15 @@ cp dist/index.html Sids-EtherCAT-Configurator.html
 work via the portable dist; call vite through `node` directly.
 
 ## Architecture
-- `src/catalog.js` — ~490 parts across 21 brands + `GROUPS`. Every entry
+- `src/catalog-etg.js` — **generated, do not hand-edit.** 893 devices from
+  the EtherCAT Technology Group product directory (`scripts/gen-etg.py`
+  + `scripts/ethercat_products.csv`; rerun `python scripts/gen-etg.py`).
+  Placeable hardware only; the directory has no electrical data, so
+  geometry / channels / pinouts are **representative defaults per product
+  type**, flagged in the UI. `etg` = device type (searchable, and the flag
+  the SRC filter uses), `family` = the row was a product family rather
+  than an orderable part number, `url` = ETG page.
+- `src/catalog.js` — ~490 hand-curated parts across 21 brands + `GROUPS`. Every entry
   has `brand` (defaults to beckhoff). Rail terminals carry `w` (mm),
   `ebus` (mA, + supplies / − consumes), `io`, `ch`, `pinout`, `upA` and
   behaviour flags (`coupler`, `feed`, `pcFeed`, `pcBreak`, `endcap`,
@@ -41,7 +49,9 @@ work via the portable dist; call vite through `node` directly.
   original stylized SVG; brand badges are name-in-color wordmarks.
 - Beckhoff data is the most accurate (several values verified against
   infosys). Third-party parts are representative models with approximate
-  specs — say so when reporting results.
+  specs — say so when reporting results. The ETG-directory import is the
+  loosest of all: vendor, name, certification and link are real; every
+  number is a per-type default.
 - Cable colors are the user's preference, not IEC: **red = +24 V,
   black = 0 V**, blue = 24 V signal, orange = AC, GN/YE = PE, gray =
   shielded analog/encoder.
@@ -49,7 +59,11 @@ work via the portable dist; call vite through `node` directly.
 
 ## Hard-won gotchas
 1. Every `GROUPS` key must also exist in `FN` (App.jsx) or the palette
-   crashes on `FN[g.key].c` and the whole app renders blank.
+   crashes on `FN[key].c` and the whole app renders blank. `GROUPS` no
+   longer draws the palette directly — it supplies each part's **category
+   subfolder** under its company (see `CAT_LABEL` / `CAT_ORDER`), so a new
+   group key needs an `FN` entry *and* a `CAT_LABEL` + `CAT_ORDER` entry
+   or it shows up as a raw key at the end.
 2. A new `kind` needs both a `freeGeom` case and a `FreeCompG` face case,
    otherwise the part draws as a dashed placeholder.
 3. Connection points must sit inside the drawn shape — run the

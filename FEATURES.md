@@ -43,6 +43,18 @@ and exporting documentation. Deliverable: **`Sids-EtherCAT-Configurator.html`**
   terminals are K-bus / 750-bus, not native EtherCAT — bridged by the coupler.)
 - Bulk expansion parts live in **`src/catalog-extended.js`** (spread into the
   catalog at load) so the core `catalog.js` stays lean.
+- **EtherCAT Technology Group directory** — 893 devices from 259 further
+  vendors (drives, I/O systems, sensors, gateways, FSoE safety, valve
+  manifolds, panels), each linking to its ethercat.org product page.
+  Directory parts sit in the same company folders as the curated ones —
+  Beckhoff's *Drives & Motors* holds AX5103 and AX8000 side by side. The
+  **SRC** filter switches between all parts / curated catalog only / ETG
+  directory only, and search matches part number, name, **manufacturer**
+  and **device type** ("servo drive", "gateway", "lenze"). Generated from the ETG
+  CSV export; the directory carries no electrical data, so sizes, channel
+  counts and pinouts are representative defaults per product type and the
+  inspector says so on every one. Rows that are product families rather
+  than orderable part numbers are marked as such.
 - **Large control-gear expansion**: contactors, soft starters &
   solid-state contactors, thermal/electronic overload relays, motor
   protectors, MCB/MCCB, switch-disconnectors, control/timing/interface
@@ -154,11 +166,39 @@ brand's color) on its right side. Note: these are name-in-color badges,
   (overview page + cable schedule).
 - **EtherCAT Topology**: a network view showing the logical slave order —
   master → coupler → terminals (over the E-bus) → extension → next
-  station. Each coupler-headed segment is a station row; free EtherCAT
-  field devices (EP boxes, drives) appear as attached nodes. Exports PNG.
+  station. Drawn like the TwinCAT online topology: one box per slave,
+  `Term n (ID)`, ports A/B/C, blue E-bus links inside a station and green
+  RJ45 hops between stations; free EtherCAT field devices (EP boxes,
+  drives) drop off a junction port. A link appears only where the devices
+  really touch — an end cover, a gap, a PSU or the next coupler breaks the
+  E-bus — and anything off the network is listed separately as **not on
+  the E-bus**. Exports PNG.
+
+## 8b. Palette
+- **Company → category → part.** 281 company folders (Beckhoff first, the
+  rest alphabetical), each holding subfolders for what that company makes:
+  Couplers & Junctions, Embedded PCs, Digital Input, Drives & Motors,
+  Sensors, Operators & Signaling, Safety Devices, Power & Distribution…
+  A company with only one category skips the extra click. Searching or
+  picking a manufacturer expands what matched.
+- Category comes from the group a part already belongs to, so nothing
+  needs per-part tagging; `drv3` and `psu` fold into their siblings so a
+  company never shows two subfolders meaning the same thing.
 
 ## 9. Persistence & export
-- **Autosave** to localStorage; **Save/Load** project JSON.
+- **Autosave** of the working design to localStorage — reopening the app
+  picks up exactly where you left off.
+- **Project name** in the header; it names the saved file and the library
+  entry.
+- **Projects library** — named saves inside the browser (Save current /
+  Open / Update / Rename / Delete, each showing date and device + wire
+  counts). No file juggling for day-to-day work; cleared if you clear
+  site data.
+- **Save file / Import** — JSON copy named after the project
+  (`line-3-panel.json`) carrying `app`, `version`, `name`, `savedAt`.
+  Use it to back up a design, send it to someone, or move it to another
+  machine or browser. Import reports anything it had to skip (parts no
+  longer in the catalog).
 - **Excel (.xls)** BOM export — genuine SpreadsheetML spreadsheet with
   a Bill-of-Materials sheet (Qty, Part Number, Manufacturer, Description,
   Category) and a Cables sheet.
@@ -208,7 +248,8 @@ brand's color) on its right side. Note: these are name-in-color badges,
 7. **Cable length estimation** & wire-duct fill for the BOM.
 8. **Multi-rail EtherCAT topology** (junction/branch modelling) and
    automatic frame/bandwidth calculation.
-9. **Project templates / library** and shareable links.
+9. **Starter templates** and shareable links (the named project library
+   itself now exists — see §9).
 10. **Per-part datasheet deep links** for third-party brands.
 
 *Proposed (2026-07-24 review — WAGO Smart Designer gap analysis + realism):*

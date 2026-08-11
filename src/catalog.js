@@ -12,6 +12,7 @@
  * keep this core file lean.
  */
 import { EXTRA } from "./catalog-extended.js";
+import { ETG } from "./catalog-etg.js";
 export const CATALOG = [
   // --- Couplers & Embedded PCs ---
   { id: "EK1100", name: "EtherCAT Coupler",            fn: "cplr", io: null, ch: 0, w: 44, ebus: +2000, coupler: true, desc: "E-bus head station, X1 IN / X2 OUT, 5 V / 2 A E-bus" },
@@ -753,6 +754,8 @@ export const CATALOG = [
 
   // bulk expansion (power sources, KL / WAGO 750 terminals, deeper vendor lines)
   ...EXTRA,
+  // EtherCAT Technology Group product directory (generated — see scripts/gen-etg.py)
+  ...ETG,
 ];
 
 // every catalog entry carries a manufacturer; unset → Beckhoff
@@ -809,7 +812,9 @@ const KIND_GROUP = {
     if (listed.has(d.id)) return;
     let key;
     if (["motor", "drive", "linaxis"].includes(d.kind)) key = d.brand === "beckhoff" ? "drv" : "drv3";
-    else if (d.kind === "box") key = d.safety ? "safe" : "sw";
+    // a generic box is switchgear unless it says otherwise — safety devices and
+    // network kit (gateways, media converters, interface cards) file properly
+    else if (d.kind === "box") key = d.safety ? "safe" : d.fn === "net" ? "net" : "sw";
     else key = KIND_GROUP[d.kind] || (d.free ? "sens" : d.fn);
     (byKey[key] || byKey.sens).ids.push(d.id);
   });

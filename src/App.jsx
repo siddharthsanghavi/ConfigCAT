@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { jsPDF } from "jspdf";
 import { CATALOG, GROUPS } from "./catalog";
+import { ETG_BRANDS } from "./catalog-etg.js";
 import { validateStation, classifyPoint } from "./validate";
 
 /* ------------------------------------------------------------------ *
@@ -93,7 +94,33 @@ const BRANDS = {
   adc:        { name: "AUTOMATIONDIRECT", c: "#E31837" },
   generic:    { name: "SUPPLY", c: "#C4262E" },
   weidmuller: { name: "WEIDMÜLLER", c: "#F58220" },
+  // vendors from the ETG directory import: name-only wordmarks in a neutral
+  // slate — their real brand colours are not known here, and guessing one
+  // would put fake branding on the drawing
+  ...ETG_BRANDS,
 };
+/* The palette is a two-level tree: company → category → parts, so a vendor's
+ * folder holds everything it makes, EtherCAT directory imports and curated
+ * parts alike. The category comes from the GROUPS entry a part already belongs
+ * to (hand-listed or auto-filed by kind), relabelled for use as a subfolder;
+ * `drv3`/`psu` fold into their siblings so a company never shows two subfolders
+ * that mean the same thing. Every key here must exist in FN — the subfolder
+ * dot is FN[key].c. */
+const CAT_CANON = { drv3: "drv", psu: "pwr" };
+const CAT_LABEL = {
+  cplr: "Couplers & Junctions", epc: "Embedded PCs", pc: "Industrial PCs", pnl: "Panels & HMI",
+  di: "Digital Input", do: "Digital Output", ai: "Analog Input", ao: "Analog Output",
+  pos: "Position & Encoder", mot: "Motion Terminals", com: "Communication",
+  saf: "TwinSAFE", sys: "System & Power Terminals",
+  klbus: "KL Bus Terminals (K-bus)", w750: "WAGO 750 I/O",
+  iobox: "IP67 I/O & IO-Link", drv: "Drives & Motors", sens: "Sensors",
+  hmi: "Operators & Signaling", safe: "Safety Devices", pneu: "Pneumatics & Valves",
+  net: "Network & Infrastructure", sw: "Switching & Protection",
+  pwr: "Power & Distribution", src: "Power Sources",
+};
+// controllers first, then rail I/O, then field devices, then supporting kit
+const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "pos", "mot", "com", "saf",
+  "sys", "klbus", "w750", "iobox", "drv", "sens", "hmi", "safe", "pneu", "net", "sw", "pwr", "src"];
 // ec: EtherCAT-capable cable (gets a green glow; blinks yellow when the
 // station carries Safety over EtherCAT / FSoE — i.e. safe I/O + a TwinSAFE
 // Logic are both present, so the black-channel telegrams ride these cables)
@@ -199,7 +226,45 @@ function autoWireType(A, B) {
 }
 
 /* ---- persistence ---------------------------------------------------- */
-const STORE_KEY = "beckhoff-configurator-v1";
+const STORE_KEY = "beckhoff-configurator-v1";        // the working doc (autosaved)
+const LIB_KEY = "beckhoff-configurator-library-v1";  // named in-browser saves
+const FILE_TAG = "sids-ethercat-configurator";
+const DEF_NAME = "Untitled station";
+const cleanName = (s) => (typeof s === "string" ? s.trim().slice(0, 60) : "");
+const slug = (s) => cleanName(s).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "station";
+
+// the library is a plain { id: {id, name, savedAt, doc} } map so a corrupt
+// entry can never take out the rest of the list
+function loadLibrary() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LIB_KEY));
+    if (!raw || typeof raw !== "object") return {};
+    const out = {};
+    for (const [id, e] of Object.entries(raw)) {
+      const doc = sanitizeDoc(e?.doc);
+      if (doc) out[id] = { id, name: cleanName(e.name) || DEF_NAME, savedAt: e.savedAt || "", doc };
+    }
+    return out;
+  } catch { return {}; }
+}
+function saveLibrary(lib) {
+  try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); return true; }
+  catch { return false; } // quota / private mode
+}
+// counts what sanitizeDoc threw away, so an import can say so out loud
+function droppedBy(raw, clean) {
+  if (!raw || !clean) return null;
+  const rawItems = (Array.isArray(raw.rails) ? raw.rails : []).reduce((n, r) => n + (Array.isArray(r?.items) ? r.items.length : 0), 0);
+  const items = clean.rails.reduce((n, r) => n + r.items.length, 0);
+  const free = (Array.isArray(raw.free) ? raw.free : []).length - clean.free.length;
+  const wires = (Array.isArray(raw.wires) ? raw.wires : []).length - clean.wires.length;
+  const unknown = [...new Set([
+    ...(Array.isArray(raw.rails) ? raw.rails : []).flatMap((r) => (Array.isArray(r?.items) ? r.items : [])),
+    ...(Array.isArray(raw.free) ? raw.free : []),
+  ].filter((x) => x?.catId && !byId[x.catId]).map((x) => x.catId))];
+  const n = (rawItems - items) + Math.max(0, free) + Math.max(0, wires);
+  return n > 0 ? { n, unknown } : null;
+}
 function reseedSeq(rails, free = []) {
   let m = 0;
   const bump = (uid) => { const n = Number(String(uid).slice(1)); if (n > m) m = n; };
@@ -223,9 +288,10 @@ function sanitizeDoc(raw) {
   const wires = (Array.isArray(raw.wires) ? raw.wires : []).filter(
     (w) => w && w.id && w.a && w.b && wireById[w.type] && uids.has(w.a.uid) && uids.has(w.b.uid)
   );
-  return { rails, wires, free };
+  return { name: cleanName(raw.name) || DEF_NAME, rails, wires, free };
 }
 const demoDoc = () => ({
+  name: "Demo station",
   rails: [{ id: "r1", items: ["EK1100", "EL1008", "EL2008", "EL3004", "EL4004", "EL9410", "EL1904", "EK1110", "EL9011"].map(mkInst) }],
   wires: [],
   free: [],
@@ -697,10 +763,12 @@ export default function BeckhoffConfigurator() {
   const [copied, setCopied] = useState(false);
   const [q, setQ] = useState("");
   const [brandFilter, setBrandFilter] = useState("all");
+  const [srcFilter, setSrcFilter] = useState("all"); // all | curated | etg
   const [detail, setDetail] = useState(null);
   const [diagOpen, setDiagOpen] = useState(false);
   const [topoOpen, setTopoOpen] = useState(false);
-  const [openGroups, setOpenGroups] = useState({ cplr: true });
+  // palette folders: keyed by company, and by `company/category` for subfolders
+  const [openGroups, setOpenGroups] = useState({ beckhoff: true, "beckhoff/cplr": true });
   const svgRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -888,18 +956,67 @@ export default function BeckhoffConfigurator() {
   const setWireTypeOf = (id, type) => setWiresW((w) => w.map((x) => (x.id === id ? { ...x, type } : x)));
 
   /* ---- project I/O + exports ---------------------------------------- */
-  const saveProject = () => download("beckhoff-station.json", JSON.stringify({ version: 1, ...doc }, null, 2), "application/json");
+  const projName = doc.name || DEF_NAME;
+  // renaming is not a structural edit — keep it out of the undo stack
+  const setProjName = (name) => setDoc((d) => ({ ...d, name }));
+  // swap the whole document in (file import or library open)
+  const openDoc = (nd) => {
+    reseedSeq(nd.rails, nd.free);
+    update(() => nd);
+    setSelected(null); setSelWire(null); setPending(null); setActiveRail(0);
+  };
+  const saveProject = () =>
+    download(`${slug(projName)}.json`,
+      JSON.stringify({ app: FILE_TAG, version: 1, name: projName, savedAt: new Date().toISOString(), ...doc }, null, 2),
+      "application/json");
   const loadProject = (e) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
     f.text().then((txt) => {
-      const nd = sanitizeDoc(JSON.parse(txt));
+      const raw = JSON.parse(txt);
+      const nd = sanitizeDoc(raw);
       if (!nd || !nd.rails.length) throw new Error("empty");
-      reseedSeq(nd.rails, nd.free);
-      update(() => nd);
-      setSelected(null); setSelWire(null); setPending(null); setActiveRail(0);
+      // fall back to the file name when the project carries no name of its own
+      if (!cleanName(raw.name)) nd.name = cleanName(f.name.replace(/\.json$/i, "")) || DEF_NAME;
+      openDoc(nd);
+      const lost = droppedBy(raw, nd);
+      showFlash(lost
+        ? `Loaded “${nd.name}” — ${lost.n} item(s) skipped${lost.unknown.length ? `: unknown part(s) ${lost.unknown.slice(0, 4).join(", ")}` : ""}`
+        : `Loaded “${nd.name}”`);
     }).catch(() => alert("Not a valid station project file (expected JSON with rails/wires)."));
+  };
+
+  /* ---- in-browser project library ------------------------------------ */
+  const [library, setLibrary] = useState(loadLibrary);
+  const [projOpen, setProjOpen] = useState(false);
+  const writeLibrary = (lib) => {
+    if (!saveLibrary(lib)) { alert("Could not save — browser storage is full or blocked. Use Save to keep a JSON file instead."); return false; }
+    setLibrary(lib);
+    return true;
+  };
+  // save the current design into a slot; omit id to create a new one
+  const libSave = (name, id) => {
+    const key = id || `p${Date.now()}`;
+    const entry = { id: key, name: cleanName(name) || DEF_NAME, savedAt: new Date().toISOString(), doc: { ...doc, name: cleanName(name) || DEF_NAME } };
+    if (!writeLibrary({ ...library, [key]: entry })) return;
+    setProjName(entry.name);
+    showFlash(`Saved “${entry.name}” to this browser`);
+  };
+  const libOpen = (id) => {
+    const e = library[id]; if (!e) return;
+    openDoc({ ...e.doc, name: e.name });
+    setProjOpen(false);
+    showFlash(`Opened “${e.name}”`);
+  };
+  const libDelete = (id) => {
+    const rest = { ...library }; delete rest[id];
+    writeLibrary(rest);
+  };
+  const libRename = (id, name) => {
+    const e = library[id]; if (!e) return;
+    const nm = cleanName(name) || DEF_NAME;
+    writeLibrary({ ...library, [id]: { ...e, name: nm, doc: { ...e.doc, name: nm } } });
   };
   // aggregate the BOM keyed by resolved part number (variant-aware)
   const bomRows = () => {
@@ -1247,15 +1364,47 @@ export default function BeckhoffConfigurator() {
     const lb = t.geom.pts[e.pt]?.label ?? e.pt + 1;
     return `${t.d.id}·${lb}`;
   };
-  const filt = (ids) => ids.filter((id) => {
-    const d = byId[id];
-    if (brandFilter !== "all" && d.brand !== brandFilter) return false;
-    return !q || id.toLowerCase().includes(q.toLowerCase()) || d.name.toLowerCase().includes(q.toLowerCase());
-  });
+  const filt = (ids) => {
+    const needle = q.trim().toLowerCase();
+    return ids.filter((id) => {
+      const d = byId[id];
+      if (brandFilter !== "all" && d.brand !== brandFilter) return false;
+      if (srcFilter === "etg" && !d.etg) return false;
+      if (srcFilter === "curated" && d.etg) return false;
+      if (!needle) return true;
+      // vendor and device type are searchable too, so grouping the ETG import
+      // by company doesn't lose the "show me every servo drive" question
+      return id.toLowerCase().includes(needle)
+        || d.name.toLowerCase().includes(needle)
+        || (BRANDS[d.brand]?.name || d.brand).toLowerCase().includes(needle)
+        || (d.etg || "").toLowerCase().includes(needle);
+    });
+  };
   // manufacturers present in the catalog, for the filter dropdown
   const brandList = useMemo(() => {
     const set = new Set(CATALOG.map((d) => d.brand));
     return [...set].sort((a, b) => (BRANDS[a]?.name || a).localeCompare(BRANDS[b]?.name || b));
+  }, []);
+
+  // company → category → parts. Beckhoff leads (it is what this app is for),
+  // everyone else alphabetical; categories keep CAT_ORDER, not alphabetical.
+  const palTree = useMemo(() => {
+    const catOf = {};
+    GROUPS.forEach((g) => g.ids.forEach((id) => { catOf[id] = CAT_CANON[g.key] || g.key; }));
+    const cos = {};
+    CATALOG.forEach((d) => {
+      const co = (cos[d.brand] ||= { brand: d.brand, name: BRANDS[d.brand]?.name || d.brand, cats: {}, n: 0 });
+      (co.cats[catOf[d.id] || "sens"] ||= []).push(d.id);
+      co.n++;
+    });
+    return Object.values(cos)
+      .sort((a, b) => (a.brand === "beckhoff" ? -1 : b.brand === "beckhoff" ? 1 : a.name.localeCompare(b.name)))
+      .map((co) => ({
+        ...co,
+        cats: Object.entries(co.cats)
+          .sort((a, b) => CAT_ORDER.indexOf(a[0]) - CAT_ORDER.indexOf(b[0]))
+          .map(([key, ids]) => ({ key, label: CAT_LABEL[key] || key, ids })),
+      }));
   }, []);
 
   return (
@@ -1277,15 +1426,20 @@ export default function BeckhoffConfigurator() {
             {showWires ? "Hide wires" : `Show wires (${wires.length})`}
           </button>
           <button style={S.btnGhost} onClick={addRail}>+ Add rail</button>
-          <button style={S.btnGhost} onClick={saveProject} title="Download the project as JSON">Save</button>
-          <button style={S.btnGhost} onClick={() => fileRef.current?.click()} title="Load a project JSON">Load</button>
+          <input style={S.projName} value={projName} onChange={(e) => setProjName(e.target.value.slice(0, 60))}
+            onFocus={(e) => e.target.select()} title="Project name — used for the saved file and the in-browser library" />
+          <button style={S.btnGhost} onClick={() => setProjOpen(true)} title="Save to / open from this browser (no file needed)">
+            Projects{Object.keys(library).length ? ` (${Object.keys(library).length})` : ""}
+          </button>
+          <button style={S.btnGhost} onClick={saveProject} title="Download the project as a JSON file">Save file</button>
+          <button style={S.btnGhost} onClick={() => fileRef.current?.click()} title="Import a project JSON file">Import</button>
           <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={loadProject} />
           <button style={S.btnGhost} onClick={exportPng} title="Export the station drawing as PNG">PNG</button>
           <button style={S.btnGhost} onClick={exportXlsx} title="Export the BOM as an Excel spreadsheet">Excel</button>
           <button style={S.btnGhost} onClick={exportXml} title="Export a TwinCAT-style device list (compare against EtherCAT > Scan)">XML</button>
           <button style={S.btnGhost} onClick={() => setDiagOpen(true)} title="Generate a compact electrical connection diagram">Diagram</button>
           <button style={S.btnGhost} onClick={() => setTopoOpen(true)} title="Show the EtherCAT network topology (master → couplers → terminals → next station)">Topology</button>
-          <button style={S.btnGhost} onClick={() => { update(() => ({ rails: [{ id: "r1", items: [] }], wires: [], free: [] })); setSelected(null); setPending(null); setSelWire(null); setActiveRail(0); }}>Clear all</button>
+          <button style={S.btnGhost} onClick={() => { update(() => ({ name: DEF_NAME, rails: [{ id: "r1", items: [] }], wires: [], free: [] })); setSelected(null); setPending(null); setSelWire(null); setActiveRail(0); }}>Clear all</button>
         </div>
       </header>
 
@@ -1302,6 +1456,11 @@ export default function BeckhoffConfigurator() {
             </span>
           )}
         </div>
+      )}
+
+      {/* the wire bar owns the flash while wiring; everywhere else it toasts */}
+      {flash && !wireMode && (
+        <div style={{ ...S.toast, color: flash.startsWith("✕") ? "#FF9A9A" : "#fff" }}>{flash}</div>
       )}
 
       <div style={S.layout}>
@@ -1327,8 +1486,8 @@ export default function BeckhoffConfigurator() {
             </div>
           )}
           <input className="wireInput" style={{ ...S.wireInput, width: "100%", boxSizing: "border-box", marginBottom: 8 }}
-            placeholder="Search catalog… (e.g. EL32, relay)" value={q} onChange={(e) => setQ(e.target.value)} />
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+            placeholder="Search catalog… (EL32, relay, ABB, servo)" value={q} onChange={(e) => setQ(e.target.value)} />
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>MFR</span>
             <select value={brandFilter} onChange={(e) => setBrandFilter(e.target.value)}
               style={{ ...S.railSelect, flex: 1 }}>
@@ -1336,33 +1495,71 @@ export default function BeckhoffConfigurator() {
               {brandList.map((b) => <option key={b} value={b}>{BRANDS[b]?.name || b}</option>)}
             </select>
           </div>
-          {GROUPS.map((g) => {
-            const ids = filt(g.ids);
-            if (!ids.length) return null;
-            const open = !!q || brandFilter !== "all" || !!openGroups[g.key];
-            return (
-              <div key={g.key} style={{ marginBottom: 8 }}>
-                <button style={S.groupBtn}
-                  onClick={() => setOpenGroups((o) => ({ ...o, [g.key]: !o[g.key] }))}>
-                  <span style={{ ...S.groupDot, background: FN[g.key].c }} />
-                  <span style={{ flex: 1, textAlign: "left" }}>{g.title}</span>
-                  <span style={{ color: C.muted, fontWeight: 500 }}>{ids.length} {open ? "▾" : "▸"}</span>
-                </button>
-                {open && ids.map((id) => {
-                  const d = byId[id];
-                  return (
-                    <button key={id} className="palItem" style={S.palItem} onClick={() => add(id)} title={d.desc || d.name}
-                      draggable onDragStart={(e) => e.dataTransfer.setData("text/catid", id)}>
-                      <span style={{ ...S.palStripe, background: FN[d.fn].c }} />
-                      <span style={S.palId}>{id}</span>
-                      <span style={S.palName}>{d.name}</span>
-                      <span style={S.palPlus}>+</span>
-                    </button>
-                  );
-                })}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.muted }}>SRC</span>
+            <select value={srcFilter} onChange={(e) => setSrcFilter(e.target.value)}
+              style={{ ...S.railSelect, flex: 1 }}
+              title="Curated = hand-checked specs. ETG = the EtherCAT Technology Group directory import (representative specs)">
+              <option value="all">All parts</option>
+              <option value="curated">Curated catalog only</option>
+              <option value="etg">ETG / EtherCAT directory only</option>
+            </select>
+          </div>
+          {(() => {
+            // a search or a manufacturer pick opens what it matched, otherwise
+            // 280-odd company folders would just sit there closed
+            const forced = !!q.trim() || brandFilter !== "all";
+            let anyHit = false;
+            const rows = palTree.map((co) => {
+              const cats = co.cats.map((c) => ({ ...c, hits: filt(c.ids) })).filter((c) => c.hits.length);
+              if (!cats.length) return null;
+              anyHit = true;
+              const total = cats.reduce((n, c) => n + c.hits.length, 0);
+              const coOpen = forced || !!openGroups[co.brand];
+              return (
+                <div key={co.brand} style={{ marginBottom: 8 }}>
+                  <button style={S.groupBtn}
+                    onClick={() => setOpenGroups((o) => ({ ...o, [co.brand]: !o[co.brand] }))}>
+                    <span style={{ ...S.groupDot, background: BRANDS[co.brand]?.c || "#5A6B7A" }} />
+                    <span style={{ flex: 1, textAlign: "left" }}>{co.name}</span>
+                    <span style={{ color: C.muted, fontWeight: 500 }}>{total} {coOpen ? "▾" : "▸"}</span>
+                  </button>
+                  {coOpen && cats.map((c) => {
+                    const ck = `${co.brand}/${c.key}`;
+                    // with one category there is nothing to choose between, so
+                    // skip the extra click and show the parts directly
+                    const catOpen = forced || cats.length === 1 || !!openGroups[ck];
+                    return (
+                      <div key={ck} style={{ marginLeft: 8 }}>
+                        <button style={S.catBtn} onClick={() => setOpenGroups((o) => ({ ...o, [ck]: !o[ck] }))}>
+                          <span style={{ ...S.catDot, background: FN[c.key]?.c || "#98A2AC" }} />
+                          <span style={{ flex: 1, textAlign: "left" }}>{c.label}</span>
+                          <span style={{ color: C.muted, fontWeight: 500 }}>{c.hits.length} {catOpen ? "▾" : "▸"}</span>
+                        </button>
+                        {catOpen && c.hits.map((id) => {
+                          const d = byId[id];
+                          return (
+                            <button key={id} className="palItem" style={S.palItem} onClick={() => add(id)} title={d.desc || d.name}
+                              draggable onDragStart={(e) => e.dataTransfer.setData("text/catid", id)}>
+                              <span style={{ ...S.palStripe, background: FN[d.fn].c }} />
+                              <span style={S.palId}>{id}</span>
+                              <span style={S.palName}>{d.name}</span>
+                              <span style={S.palPlus}>+</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            });
+            return anyHit ? rows : (
+              <div style={{ fontSize: 12, color: C.muted, padding: "6px 2px" }}>
+                Nothing matches that search and filter combination.
               </div>
             );
-          })}
+          })()}
         </aside>
 
         <main style={S.stage} className="scroll">
@@ -1651,6 +1848,15 @@ export default function BeckhoffConfigurator() {
                     <div style={S.inspName}>{(BRANDS[selD.brand]?.name || "")} · {selD.name}</div>
                   </div>
                 </div>
+                {selD.etg && (
+                  <div style={S.etgNote}>
+                    <b>ETG directory entry — {selD.etg}.</b> {selD.family
+                      ? "This is a product family, not an orderable part number — pick the exact model from the vendor."
+                      : "Part number as listed in the directory."}
+                    {" "}Size, channel count and pinout are representative defaults, not the vendor's data sheet.
+                    {selD.etgCert ? " Listed as ETG-certified." : " Not listed as ETG-certified."}
+                  </div>
+                )}
                 {selD.desc && <div style={S.inspDesc}>{selD.desc}</div>}
                 <div style={S.inspMeta}>
                   <span>{FN[selD.fn].label}</span>
@@ -1707,12 +1913,14 @@ export default function BeckhoffConfigurator() {
                 </div>
                 <div style={S.inspBtns}>
                   {selLoc && <button style={S.btnMini} onClick={() => setDetail(selected)}>🔍 Detail view</button>}
-                  <a href={selD.brand === "beckhoff"
-                      ? `https://www.beckhoff.com/en-us/search-results/?q=${encodeURIComponent(selD.id)}`
-                      : `https://duckduckgo.com/?q=${encodeURIComponent((BRANDS[selD.brand]?.name || "") + " " + selD.id)}`}
+                  <a href={selD.url
+                      ? selD.url
+                      : selD.brand === "beckhoff"
+                        ? `https://www.beckhoff.com/en-us/search-results/?q=${encodeURIComponent(selD.id)}`
+                        : `https://duckduckgo.com/?q=${encodeURIComponent((BRANDS[selD.brand]?.name || "") + " " + selD.id)}`}
                     target="_blank" rel="noreferrer"
                     style={{ ...S.btnMini, textDecoration: "none", textAlign: "center", lineHeight: 1.4 }}>
-                    {selD.brand === "beckhoff" ? "beckhoff.com ↗" : "web ↗"}
+                    {selD.url ? "ethercat.org ↗" : selD.brand === "beckhoff" ? "beckhoff.com ↗" : "web ↗"}
                   </a>
                 </div>
                 {selLoc && rails.length > 1 && (
@@ -1758,6 +1966,11 @@ export default function BeckhoffConfigurator() {
 
       {diagOpen && <DiagramModal rails={rails} free={free} wires={wires} layout={layout} onClose={() => setDiagOpen(false)} />}
       {topoOpen && <TopologyModal rails={rails} free={free} onClose={() => setTopoOpen(false)} />}
+      {projOpen && (
+        <ProjectsModal library={library} current={projName} doc={doc}
+          onSave={libSave} onOpen={libOpen} onDelete={libDelete} onRename={libRename}
+          onClose={() => setProjOpen(false)} />
+      )}
 
       {/* zoomed terminal detail view (double-click a terminal or 🔍 Detail) */}
       {detailD && detailLoc && (() => {
@@ -2359,65 +2572,222 @@ const ROLE_COLOR = {
   di: "#F2B705", do: "#E8503A", ai: "#25A37A", ao: "#2F80ED", agnd: "#7FA8B8",
 };
 
+/* --- in-browser project library: named saves in localStorage, so a design
+ * survives a reload without juggling JSON files. Files remain the way to move
+ * a design between machines / browsers. ------------------------------------ */
+function ProjectsModal({ library, current, doc, onSave, onOpen, onDelete, onRename, onClose }) {
+  const [name, setName] = useState(current);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const [renaming, setRenaming] = useState(null);
+  const [renameTo, setRenameTo] = useState("");
+
+  const rows = Object.values(library).sort((a, b) => (b.savedAt || "").localeCompare(a.savedAt || ""));
+  const count = (d) => d.rails.reduce((n, r) => n + r.items.length, 0) + (d.free?.length || 0);
+  const when = (s) => { const t = new Date(s); return isNaN(t) ? "—" : t.toLocaleString(); };
+  const clash = rows.find((r) => r.name.toLowerCase() === cleanName(name).toLowerCase());
+
+  return (
+    <div style={S.modalWrap} onClick={onClose}>
+      <div style={{ ...S.modal, width: 620, maxWidth: "94vw" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ ...S.inspId, fontSize: 16 }}>Projects</span>
+          <button style={S.btnGhost} onClick={onClose}>✕ Close</button>
+        </div>
+        <p style={{ color: C.muted, fontSize: 12, margin: "0 0 12px" }}>
+          Saved in this browser on this machine — clearing site data removes them. Use <b>Save file</b> in the header
+          for a JSON copy you can back up, email, or open on another machine.
+        </p>
+
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+          <input style={{ ...S.wireInput, flex: 1 }} value={name} placeholder="Project name"
+            onChange={(e) => setName(e.target.value.slice(0, 60))} />
+          <button style={{ ...S.btnGhost, ...S.btnOn }} onClick={() => { onSave(name, clash?.id); onClose(); }}>
+            {clash ? "Overwrite" : "Save current"}
+          </button>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.muted, marginBottom: 14 }}>
+          {clash ? `“${clash.name}” already exists — saving replaces it.` : `Saves ${count(doc)} device(s) and ${doc.wires.length} wire(s).`}
+        </div>
+
+        {rows.length === 0 ? (
+          <p style={{ color: C.muted, fontSize: 13 }}>Nothing saved yet.</p>
+        ) : (
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <td style={S.tCell}>
+                    {renaming === r.id ? (
+                      <input style={{ ...S.wireInput, width: "100%" }} value={renameTo} autoFocus
+                        onChange={(e) => setRenameTo(e.target.value.slice(0, 60))}
+                        onKeyDown={(e) => { if (e.key === "Enter") { onRename(r.id, renameTo); setRenaming(null); } if (e.key === "Escape") setRenaming(null); }} />
+                    ) : (
+                      <>
+                        <div style={{ fontWeight: 600 }}>{r.name}</div>
+                        <div style={{ color: C.muted, fontSize: 11 }}>
+                          {when(r.savedAt)} · {count(r.doc)} device(s) · {r.doc.wires.length} wire(s)
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td style={{ ...S.tCell, textAlign: "right", whiteSpace: "nowrap" }}>
+                    {renaming === r.id ? (
+                      <>
+                        <button style={S.btnMini} onClick={() => { onRename(r.id, renameTo); setRenaming(null); }}>Save name</button>{" "}
+                        <button style={S.btnMini} onClick={() => setRenaming(null)}>Cancel</button>
+                      </>
+                    ) : confirmDel === r.id ? (
+                      <>
+                        <span style={{ color: C.muted, fontSize: 11.5, marginRight: 6 }}>Delete?</span>
+                        <button style={{ ...S.btnMini, color: C.brand }} onClick={() => { onDelete(r.id); setConfirmDel(null); }}>Yes</button>{" "}
+                        <button style={S.btnMini} onClick={() => setConfirmDel(null)}>No</button>
+                      </>
+                    ) : (
+                      <>
+                        <button style={S.btnMini} onClick={() => onOpen(r.id)}>Open</button>{" "}
+                        <button style={S.btnMini} onClick={() => { onSave(r.name, r.id); onClose(); }} title="Replace this save with the current design">Update</button>{" "}
+                        <button style={S.btnMini} onClick={() => { setRenaming(r.id); setRenameTo(r.name); }}>Rename</button>{" "}
+                        <button style={S.btnMini} onClick={() => setConfirmDel(r.id)}>Delete</button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* --- EtherCAT topology view: the logical slave order (master → coupler →
  * terminals over the E-bus → extension → next station). Each coupler-headed
  * segment on a rail is a station row; field devices attach via cabling. ----- */
 function TopologyModal({ rails, free, onClose }) {
   const tref = useRef(null);
 
-  const stations = useMemo(() => {
-    const out = [];
+  // The E-bus is a physical contact chain: it starts at a coupler / embedded PC
+  // and is broken by an end cover, by a gap on the rail, by the next coupler,
+  // and by anything with no E-bus contacts (a PSU brick). Devices outside a
+  // coupler-headed run sit on the rail but are NOT on the network — they are
+  // listed apart rather than drawn into the chain.
+  const { stations, strays } = useMemo(() => {
+    const out = [], stray = [];
     const railCount = {};
     rails.forEach((rail, ri) => {
       let seg = [], head = false;
       const flush = () => {
         if (head && seg.length) { railCount[ri] = (railCount[ri] || 0) + 1; out.push({ items: seg, ri, part: railCount[ri] }); }
+        else seg.forEach((x) => stray.push({ ...x, ri, why: "no coupler ahead of it" }));
         seg = []; head = false;
       };
       for (const inst of rail.items) {
         const d = byId[inst.catId]; if (!d) continue;
-        if (d.endcap) { flush(); continue; }
-        if (d.coupler || d.cx) head = true;
-        if (head) seg.push({ d, uid: inst.uid });
+        if (inst.gap > 0) flush();            // gapped away — the contacts do not touch
+        if (d.endcap) { flush(); continue; }  // the cover terminates the station
+        if (d.psu) {                          // mains PSU: sits on the rail, no E-bus
+          flush();
+          stray.push({ d, uid: inst.uid, ri, why: "no E-bus contacts" });
+          continue;
+        }
+        if (d.coupler || d.cx) { flush(); head = true; } // a coupler heads its own station
+        seg.push({ d, uid: inst.uid });
       }
       flush();
     });
     out.forEach((s) => { s.multi = railCount[s.ri] > 1; });
-    return out;
+    return { stations: out, strays: stray };
   }, [rails]);
 
   const ecFree = useMemo(() => (free || [])
     .map((f) => ({ f, d: byId[f.catId] }))
     .filter((x) => x.d && ["epbox", "iol", "iolhub", "drive", "linaxis"].includes(x.d.kind)), [free]);
 
-  const NW = 88, NH = 46, GX = 20, X0 = 28, TOPY = 24, MASTER_W = 210, MASTER_H = 46, ROWGAP = 66;
-  const rowY = (i) => TOPY + MASTER_H + 46 + i * (NH + ROWGAP);
+  // TwinCAT's online topology draws one box per slave top-down: the frame enters
+  // a station at the coupler, runs the E-bus terminals in order, leaves over
+  // RJ45 to the next station. Branch ports (junctions) drop to a second column.
+  const NW = 190, NH = 40, VGAP = 22, X0 = 34, TOPY = 22;
+  const MASTER_W = 214, MASTER_H = 46, PORTX = 24, COLGAP = 78, LABEL_H = 20, SGAP = 50;
 
-  const rows = stations.map((st, i) => {
-    let x = X0;
-    const nodes = st.items.map((it) => { const n = { ...it, x, y: rowY(i) }; x += NW + GX; return n; });
-    return { ...st, i, nodes, right: x - GX };
+  // --- lay out the trunk: master → station → station, one node per slave ---
+  const nodes = [], bands = [];
+  let y = TOPY + MASTER_H + 40 + LABEL_H, slaveNo = 0;
+  stations.forEach((st, si) => {
+    const y0 = y;
+    st.items.forEach((it) => {
+      nodes.push({ ...it, x: X0, y, no: ++slaveNo, si, first: !nodes.length || nodes[nodes.length - 1].si !== si });
+      y += NH + VGAP;
+    });
+    bands.push({ si, ri: st.ri, part: st.part, multi: st.multi, y0, y1: y - VGAP, n: si + 1 });
+    y += SGAP - VGAP;
   });
-  const freeY = rowY(rows.length);
-  const freeNodes = ecFree.map((x, k) => ({ ...x, x: X0 + k * (NW + GX), y: freeY }));
+  const trunkBottom = nodes.length ? nodes[nodes.length - 1].y + NH : TOPY + MASTER_H;
 
-  const contentRight = Math.max(X0 + MASTER_W, ...rows.map((r) => r.right), freeNodes.length ? X0 + freeNodes.length * (NW + GX) - GX : 0);
-  const width = Math.max(720, contentRight + X0);
-  const bottom = (ecFree.length ? freeY : (rows.length ? rowY(rows.length - 1) : TOPY + MASTER_H)) + NH;
-  const height = bottom + 28;
+  // links between consecutive slaves: inside a station it is the E-bus, across
+  // stations it is a real Ethernet hop out of the extension / coupler port
+  const links = nodes.map((n, k) => {
+    const prev = k ? nodes[k - 1] : null;
+    return { k, from: prev, to: n, type: !prev ? "master" : prev.si === n.si ? "ebus" : "rj45" };
+  });
+
+  // field devices hang off the last junction if there is one, else off the master
+  const anchor = [...nodes].reverse().find((n) => n.d.junction) || null;
+  const bx = X0 + NW + COLGAP;
+  const branchY0 = anchor ? anchor.y : TOPY + MASTER_H + 40 + LABEL_H;
+  const freeNodes = ecFree.map((x, k) => ({ ...x, x: bx, y: branchY0 + k * (NH + VGAP) }));
+  const branchBottom = freeNodes.length ? freeNodes[freeNodes.length - 1].y + NH : 0;
+
+  // on the rail but off the network — drawn unlinked so nothing implies a bus
+  const strayY0 = (nodes.length ? trunkBottom + SGAP : TOPY + MASTER_H + 40) + LABEL_H;
+  const strayNodes = strays.map((s, k) => ({ ...s, x: X0, y: strayY0 + k * (NH + 12) }));
+  const strayBottom = strayNodes.length ? strayNodes[strayNodes.length - 1].y + NH : 0;
+
+  const width = Math.max(700, X0 * 2 + NW + (freeNodes.length ? COLGAP + NW : 0));
+  const height = Math.max(trunkBottom, branchBottom, strayBottom) + 46;
 
   const color = (d) => FN[d.fn]?.c || "#7A828A";
-  const short = (id) => (id.length > 12 ? id.slice(0, 11) + "…" : id);
-  const masterCx = X0 + MASTER_W / 2, masterBot = TOPY + MASTER_H;
+  const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+  const masterCx = X0 + MASTER_W / 2, masterBot = TOPY + MASTER_H, masterPortX = X0 + PORTX;
+  const inP = (n) => [n.x + PORTX, n.y], outP = (n) => [n.x + PORTX, n.y + NH];
+  const L = { ebus: "#5B93C7", rj45: "#1F9D4D", master: "#1F9D4D", drop: "#1F9D4D" };
 
-  const Node = ({ n }) => (
+  // small square straddling the box edge, like the port stubs in the TwinCAT view
+  const Port = ({ px, py, label, side }) => (
     <g>
-      <rect x={n.x} y={n.y} width={NW} height={NH} rx="5" fill="#fff" stroke="#C7CDD3" strokeWidth="1" />
-      <rect x={n.x} y={n.y} width="5" height={NH} rx="2.5" fill={color(n.d)} />
-      <text x={n.x + NW / 2 + 2} y={n.y + 19} fontSize="10" fontWeight="700" textAnchor="middle" fill={C.ink} fontFamily="ui-monospace,monospace">{short(n.d.id)}</text>
-      <text x={n.x + NW / 2 + 2} y={n.y + 33} fontSize="7.5" textAnchor="middle" fill={C.muted}>{FN[n.d.fn]?.label || ""}</text>
+      <rect x={px - 3.5} y={py - 3.5} width="7" height="7" rx="1" fill="#fff" stroke="#6E7781" strokeWidth="1" />
+      {label && (
+        <text x={side === "right" ? px + 7 : px - 7} y={py + 3} fontSize="7.5" fontWeight="700"
+          textAnchor={side === "right" ? "start" : "end"} fill={C.muted}>{label}</text>
+      )}
     </g>
   );
+
+  const Node = ({ n, term, chain, off }) => {
+    const d = n.d, c = off ? "#A8B0B8" : color(d);
+    // port letters only where the device really has RJ45 sockets (A in / B out)
+    const rj = d.coupler || d.cx || d.ext || d.junction;
+    const sub = off
+      ? `Rail ${n.ri + 1} · ${n.why}`
+      : [FN[d.fn]?.label, d.ch ? `${d.ch} ch` : null, d.ebus ? `${d.ebus > 0 ? "+" : ""}${d.ebus} mA` : null]
+        .filter(Boolean).join("  ·  ");
+    return (
+      <g>
+        {!off && <rect x={n.x + 1.5} y={n.y + 2.5} width={NW} height={NH} rx="4" fill="rgba(28,33,38,0.10)" />}
+        <rect x={n.x} y={n.y} width={NW} height={NH} rx="4" fill={off ? "#F4F6F8" : "#fff"}
+          stroke={off ? "#B6BEC6" : "#8E97A0"} strokeWidth="1" strokeDasharray={off ? "4 3" : ""} />
+        <path d={`M ${n.x + 4} ${n.y} h -0.5 a 3.5 3.5 0 0 0 -3.5 3.5 v ${NH - 7} a 3.5 3.5 0 0 0 3.5 3.5 h 0.5 z`} fill={c} />
+        <rect x={n.x + 4} y={n.y} width="2.5" height={NH} fill={c} />
+        <text x={n.x + 14} y={n.y + 17} fontSize="10.5" fontWeight="700" fill={off ? C.muted : C.ink} fontFamily="ui-monospace,monospace">
+          {clip(term ? `Term ${n.no} (${d.id})` : d.id, 26)}
+        </text>
+        <text x={n.x + 14} y={n.y + 30} fontSize="8" fill={C.muted}>{clip(sub, off ? 40 : 34)}</text>
+        {chain && <Port px={inP(n)[0]} py={inP(n)[1]} label={rj ? "A" : ""} />}
+        {chain && <Port px={outP(n)[0]} py={outP(n)[1]} label={rj ? "B" : ""} />}
+        {chain && d.junction && <Port px={n.x + NW} py={n.y + NH / 2} label="C" side="right" />}
+      </g>
+    );
+  };
 
   const exportPng = () => {
     const svg = tref.current; if (!svg) return;
@@ -2446,50 +2816,98 @@ function TopologyModal({ rails, free, onClose }) {
             <button style={S.btnGhost} onClick={onClose}>✕ Close</button>
           </div>
         </div>
-        {rows.length === 0 && freeNodes.length === 0 ? (
+        {nodes.length === 0 && freeNodes.length === 0 && strayNodes.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 13 }}>No EtherCAT devices yet — add a coupler and some terminals.</p>
         ) : (
           <>
             <p style={{ color: C.muted, fontSize: 12, margin: "0 0 8px" }}>
-              Logical slave order — the frame runs master → coupler → terminals (over the E-bus) → extension → next station. Each device is one EtherCAT slave; field devices attach via network cabling.
+              Logical slave order, as the TwinCAT online topology shows it — the frame runs master → coupler → terminals (over the E-bus) → extension → next station.
+              <b> Term n</b> is the auto-increment position; ports <b>A</b> in / <b>B</b> out / <b>C</b> branch.
+              A link is only drawn where the devices really touch: an end cover, a gap, a PSU or the next coupler breaks the E-bus, and stations are assumed to be cabled in the order shown.
             </p>
             <div className="scroll" style={{ overflow: "auto", maxHeight: "74vh" }}>
-              <svg ref={tref} width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ background: "#F7F8FA", borderRadius: 8 }}>
-                <rect x={X0} y={TOPY} width={MASTER_W} height={MASTER_H} rx="6" fill="#1C2A3A" />
-                <text x={masterCx} y={TOPY + 20} fontSize="11" fontWeight="700" textAnchor="middle" fill="#fff">EtherCAT Master</text>
-                <text x={masterCx} y={TOPY + 34} fontSize="8.5" textAnchor="middle" fill="#9FB0C2">TwinCAT on IPC / Embedded PC</text>
+              <svg ref={tref} width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ background: "#FBFCFD", borderRadius: 8 }}>
+                <defs>
+                  <pattern id="topogrid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#E7EBEF" strokeWidth="1" />
+                  </pattern>
+                </defs>
+                <rect x="0" y="0" width={width} height={height} fill="url(#topogrid)" />
 
-                {/* the EtherCAT line linking master → station → station */}
-                {rows.map((r, i) => {
-                  const first = r.nodes[0]; if (!first) return null;
-                  const prev = i > 0 ? rows[i - 1] : null;
-                  const fromX = prev ? prev.nodes[prev.nodes.length - 1].x + NW / 2 : masterCx;
-                  const fromY = prev ? prev.y + NH : masterBot;
-                  const toX = first.x + NW / 2, toY = first.y, midY = (fromY + toY) / 2;
-                  return <path key={"L" + i} d={`M ${fromX} ${fromY} L ${fromX} ${midY} L ${toX} ${midY} L ${toX} ${toY}`} fill="none" stroke="#1F9D4D" strokeWidth="2" />;
-                })}
-
-                {/* E-bus connectors between adjacent nodes in a station */}
-                {rows.flatMap((r) => r.nodes.slice(1).map((n, k) => (
-                  <line key={r.i + "e" + k} x1={r.nodes[k].x + NW} y1={r.nodes[k].y + NH / 2} x2={n.x} y2={n.y + NH / 2} stroke="#7FB2E0" strokeWidth="2" />
-                )))}
-
-                {/* station labels + nodes */}
-                {rows.map((r) => (
-                  <text key={"T" + r.i} x={X0} y={r.y - 7} fontSize="9" fontWeight="700" fill={C.muted}>
-                    Rail {r.ri + 1}{r.multi ? ` · station ${r.part}` : ""}
-                  </text>
-                ))}
-                {rows.flatMap((r) => r.nodes.map((n) => <Node key={n.uid} n={n} />))}
-
-                {/* free EtherCAT field devices, dashed-linked to the network */}
-                {freeNodes.length > 0 && <text x={X0} y={freeY - 7} fontSize="9" fontWeight="700" fill={C.muted}>EtherCAT field devices</text>}
-                {freeNodes.map((n) => (
-                  <g key={n.f.uid}>
-                    <path d={`M ${masterCx} ${masterBot} L ${masterCx} ${n.y - 16} L ${n.x + NW / 2} ${n.y - 16} L ${n.x + NW / 2} ${n.y}`} fill="none" stroke="#1F9D4D" strokeWidth="1.5" strokeDasharray="5 4" />
-                    <Node n={n} />
+                {/* station frames, drawn behind everything */}
+                {bands.map((b) => (
+                  <g key={"B" + b.si}>
+                    <rect x={X0 - 14} y={b.y0 - LABEL_H + 4} width={NW + 28} height={b.y1 - b.y0 + LABEL_H + 4}
+                      rx="6" fill="#FFFFFF" stroke="#DCE2E8" strokeWidth="1" strokeDasharray="4 3" />
+                    <text x={X0 - 6} y={b.y0 - 8} fontSize="9" fontWeight="700" fill={C.muted}>
+                      Station {b.n} · Rail {b.ri + 1}{b.multi ? ` (part ${b.part})` : ""}
+                    </text>
                   </g>
                 ))}
+
+                {/* master */}
+                <rect x={X0} y={TOPY} width={MASTER_W} height={MASTER_H} rx="5" fill="#1C2A3A" />
+                <text x={masterCx} y={TOPY + 20} fontSize="11" fontWeight="700" textAnchor="middle" fill="#fff">EtherCAT Master</text>
+                <text x={masterCx} y={TOPY + 34} fontSize="8.5" textAnchor="middle" fill="#9FB0C2">TwinCAT on IPC / Embedded PC</text>
+                <Port px={masterPortX} py={masterBot} />
+
+                {/* the chain: E-bus inside a station, RJ45 hop between stations */}
+                {links.map((l) => {
+                  const [fx, fy] = l.from ? outP(l.from) : [masterPortX, masterBot];
+                  const [tx, ty] = inP(l.to);
+                  const ebus = l.type === "ebus";
+                  return (
+                    <g key={"L" + l.k}>
+                      <line x1={fx} y1={fy} x2={tx} y2={ty} stroke={L[l.type]} strokeWidth={ebus ? 2 : 2.5} />
+                      {!ebus && (
+                        <text x={tx + 10} y={(fy + ty) / 2 + 3} fontSize="8" fill="#1F9D4D">
+                          {l.type === "master" ? "Ethernet / EtherCAT" : "RJ45 to next station"}
+                        </text>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {nodes.map((n) => <Node key={n.uid} n={n} term chain />)}
+
+                {/* branch column: EtherCAT field devices dropped off a junction port */}
+                {freeNodes.length > 0 && (
+                  <text x={bx - 6} y={branchY0 - 8} fontSize="9" fontWeight="700" fill={C.muted}>
+                    {anchor ? `Drop line off ${anchor.d.id} (port C)` : "EtherCAT field devices"}
+                  </text>
+                )}
+                {freeNodes.map((n) => {
+                  const [ax, ay] = anchor ? [anchor.x + NW, anchor.y + NH / 2] : [masterPortX, masterBot];
+                  const midX = (ax + n.x) / 2, ly = n.y + NH / 2;
+                  return (
+                    <g key={n.f.uid}>
+                      <path d={`M ${ax} ${ay} L ${midX} ${ay} L ${midX} ${ly} L ${n.x} ${ly}`}
+                        fill="none" stroke={L.drop} strokeWidth="1.75" strokeDasharray={anchor ? "" : "5 4"} />
+                      <Node n={n} />
+                      <Port px={n.x} py={ly} label="A" />
+                    </g>
+                  );
+                })}
+
+                {/* on the rail, off the network — no links drawn to these */}
+                {strayNodes.length > 0 && (
+                  <>
+                    <rect x={X0 - 14} y={strayY0 - LABEL_H + 4} width={NW + 28} height={strayBottom - strayY0 + LABEL_H + 4}
+                      rx="6" fill="#FFFFFF" stroke="#E3C6C6" strokeWidth="1" strokeDasharray="4 3" />
+                    <text x={X0 - 6} y={strayY0 - 8} fontSize="9" fontWeight="700" fill={C.brand}>
+                      Not on the E-bus — no connection to the network
+                    </text>
+                    {strayNodes.map((n) => <Node key={n.uid} n={n} off />)}
+                  </>
+                )}
+
+                {/* legend */}
+                <g>
+                  <line x1={X0} y1={height - 16} x2={X0 + 22} y2={height - 16} stroke={L.ebus} strokeWidth="2" />
+                  <text x={X0 + 28} y={height - 13} fontSize="8.5" fill={C.muted}>E-bus (inside station)</text>
+                  <line x1={X0 + 150} y1={height - 16} x2={X0 + 172} y2={height - 16} stroke={L.rj45} strokeWidth="2.5" />
+                  <text x={X0 + 178} y={height - 13} fontSize="8.5" fill={C.muted}>Ethernet / RJ45 hop</text>
+                </g>
               </svg>
             </div>
           </>
@@ -2829,13 +3247,20 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
   const uid = inst.uid;
   const brand = BRANDS[d.brand] || BRANDS.beckhoff;
   const brandColor = brand.c;
+  // faces with a dark housing need the wordmark lifted toward white, or a
+  // dark brand colour disappears into the body
+  const brandOnDark = (() => {
+    const [r, g, b] = hexToRgb(brandColor);
+    const m = (v) => Math.round(v + (255 - v) * 0.42);
+    return `rgb(${m(r)},${m(g)},${m(b)})`;
+  })();
   const animate = d.motion && wired; // motion parts move once powered + wired
   const face = (() => {
     switch (d.kind) {
       case "ipc": return (
         <g>
           <rect x="0" y="0" width={W} height={H} rx="5" fill="url(#psbody)" stroke={M.hEdge} strokeWidth="0.9" />
-          <text x="10" y="16" fill={C.brand} fontSize="7.5" fontWeight="800" fontFamily="system-ui">BECKHOFF</text>
+          <text x="10" y="16" fill={brandColor} fontSize="7.5" fontWeight="800" fontFamily="system-ui">{brand.name}</text>
           <text x="10" y="26" fill={M.txt} fontSize="6.5" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
           {Array.from({ length: 4 }).map((_, i) => (
             <rect key={i} x="10" y={36 + i * 7} width={W * 0.4} height="2.4" rx="1.2" fill="rgba(0,0,0,0.14)" />
@@ -2847,7 +3272,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           <rect x="0" y="0" width={W} height={H - 30} rx="5" fill="#2B2F33" stroke="#54585C" strokeWidth="1" />
           <rect x="7" y="7" width={W - 14} height={H - 52} rx="2" fill="#12405E" />
           <text x={W / 2} y={(H - 30) / 2} fill="#7FB6D9" fontSize="7" textAnchor="middle" fontFamily="system-ui">{d.name}</text>
-          <text x={W - 10} y={H - 36} fill="#C9CDD2" fontSize="5" textAnchor="end" fontFamily="system-ui">BECKHOFF {d.id}</text>
+          <text x={W - 10} y={H - 36} fill="#C9CDD2" fontSize="5" textAnchor="end" fontFamily="system-ui">{brand.name} {d.id}</text>
           <rect x="0" y={H - 30} width={W} height="30" rx="3" fill="url(#psbody)" stroke={M.hEdge} strokeWidth="0.7" />
         </g>
       );
@@ -2857,7 +3282,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           {Array.from({ length: 7 }).map((_, i) => (
             <rect key={i} x={W - 8} y={12 + i * 27} width="6" height="20" rx="1" fill="#2A2E33" />
           ))}
-          <text x="8" y="14" fill="#E84A50" fontSize="6.5" fontWeight="800" fontFamily="system-ui">BECKHOFF</text>
+          <text x="8" y="14" fill={brandOnDark} fontSize="6.5" fontWeight="800" fontFamily="system-ui">{brand.name}</text>
           <text x="8" y={H - 34} fill="#C9CDD2" fontSize="6.5" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
           <rect x={W * 0.2} y={72} width={W * 0.6} height="12" rx="2" fill={M.winFrame} />
           <rect x={W * 0.2 + 3} y={75} width="6" height="6" rx="1" fill={M.ledOn}>
@@ -3228,9 +3653,11 @@ const S = {
   brandBlock: { display: "flex", flexDirection: "column", lineHeight: 1.15 },
   brandMark: { fontWeight: 800, letterSpacing: "0.14em", color: C.brand, fontSize: 15 },
   brandSub: { fontSize: 12, color: C.muted },
-  headerActions: { display: "flex", gap: 8, alignItems: "center" },
+  headerActions: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", rowGap: 8 },
   btnGhost: { border: `1px solid ${C.line}`, background: C.panel, color: C.ink, padding: "7px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontWeight: 500 },
   btnOn: { background: C.ink, color: "#fff", border: `1px solid ${C.ink}` },
+  projName: { border: `1px solid ${C.line}`, background: C.panel, color: C.ink, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, width: 168, outline: "none" },
+  toast: { position: "fixed", top: 68, left: "50%", transform: "translateX(-50%)", background: C.ink, padding: "9px 16px", borderRadius: 9, fontSize: 12.5, fontWeight: 600, zIndex: 80, boxShadow: "0 10px 28px rgba(0,0,0,0.28)", maxWidth: "70vw" },
   wireBar: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "8px 20px", background: "#FAFBFC", borderBottom: `1px solid ${C.line}` },
   wireChip: { display: "flex", alignItems: "center", gap: 6, padding: "5px 9px", borderRadius: 7, background: C.panel, border: "none", cursor: "pointer" },
   layout: { display: "grid", gridTemplateColumns: "244px 1fr 300px", flex: 1, minHeight: 0 },
@@ -3239,6 +3666,8 @@ const S = {
   railSelect: { border: `1px solid ${C.line}`, borderRadius: 7, padding: "5px 8px", fontSize: 12, background: C.panel, color: C.ink },
   groupHead: { display: "flex", alignItems: "center", gap: 8, fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.muted, margin: "2px 0 8px" },
   groupBtn: { display: "flex", alignItems: "center", gap: 8, width: "100%", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: C.ink, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 7, padding: "7px 9px", margin: "0 0 6px", cursor: "pointer" },
+  catBtn: { display: "flex", alignItems: "center", gap: 7, width: "100%", fontSize: 10.5, fontWeight: 600, color: C.muted, background: C.panel, border: `1px solid ${C.line}`, borderRadius: 6, padding: "5px 8px", margin: "0 0 5px", cursor: "pointer" },
+  catDot: { width: 6, height: 6, borderRadius: 2, flex: "0 0 auto" },
   groupDot: { width: 8, height: 8, borderRadius: 2 },
   palItem: { display: "grid", gridTemplateColumns: "6px auto 1fr auto", alignItems: "center", gap: 8, width: "100%", textAlign: "left", background: C.panel, border: `1px solid ${C.line}`, borderRadius: 8, padding: "7px 10px", marginBottom: 5, cursor: "pointer" },
   palStripe: { width: 6, height: 24, borderRadius: 3 },
@@ -3263,6 +3692,7 @@ const S = {
   inspId: { fontFamily: "ui-monospace,Menlo,Consolas,monospace", fontWeight: 700, fontSize: 15 },
   inspName: { fontSize: 12, color: C.muted },
   inspDesc: { fontSize: 12.5, marginBottom: 8 },
+  etgNote: { fontSize: 11.5, lineHeight: 1.45, color: "#7A5B12", background: "#FFF8E6", border: "1px solid #F0DFAE", borderRadius: 7, padding: "7px 9px", marginBottom: 8 },
   inspMeta: { display: "flex", justifyContent: "space-between", fontSize: 11.5, color: C.muted, borderTop: `1px solid ${C.line}`, borderBottom: `1px solid ${C.line}`, padding: "7px 0" },
   inspBtns: { display: "flex", gap: 6, marginTop: 12 },
   btnMini: { flex: 1, border: `1px solid ${C.line}`, background: C.panel, borderRadius: 7, padding: "7px 4px", fontSize: 11.5, cursor: "pointer", fontWeight: 600, color: C.ink },
