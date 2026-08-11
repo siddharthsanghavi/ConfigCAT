@@ -121,6 +121,9 @@ const CAT_LABEL = {
 // controllers first, then rail I/O, then field devices, then supporting kit
 const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "pos", "mot", "com", "saf",
   "sys", "klbus", "w750", "iobox", "drv", "sens", "hmi", "safe", "pneu", "net", "sw", "pwr", "src"];
+// how many matched parts a search may auto-expand before the palette leaves the
+// company folders closed instead (1500-odd buttons per keystroke is not useful)
+const EXPAND_LIMIT = 250;
 // ec: EtherCAT-capable cable (gets a green glow; blinks yellow when the
 // station carries Safety over EtherCAT / FSoE — i.e. safe I/O + a TwinSAFE
 // Logic are both present, so the black-channel telegrams ride these cables)
@@ -1407,6 +1410,20 @@ export default function BeckhoffConfigurator() {
       }));
   }, []);
 
+  // the filtered palette, recomputed only when a filter actually changes
+  const palView = useMemo(() => {
+    const cos = [];
+    let total = 0;
+    for (const co of palTree) {
+      const cats = co.cats.map((c) => ({ ...c, hits: filt(c.ids) })).filter((c) => c.hits.length);
+      if (!cats.length) continue;
+      const n = cats.reduce((sum, c) => sum + c.hits.length, 0);
+      cos.push({ ...co, cats, total: n });
+      total += n;
+    }
+    return { cos, total };
+  }, [palTree, q, brandFilter, srcFilter]);
+
   return (
     <div style={S.root}>
       <style>{CSS}</style>
@@ -1506,15 +1523,16 @@ export default function BeckhoffConfigurator() {
             </select>
           </div>
           {(() => {
-            // a search or a manufacturer pick opens what it matched, otherwise
-            // 280-odd company folders would just sit there closed
-            const forced = !!q.trim() || brandFilter !== "all";
-            let anyHit = false;
-            const rows = palTree.map((co) => {
-              const cats = co.cats.map((c) => ({ ...c, hits: filt(c.ids) })).filter((c) => c.hits.length);
-              if (!cats.length) return null;
-              anyHit = true;
-              const total = cats.reduce((n, c) => n + c.hits.length, 0);
+            // A search or a manufacturer pick opens what it matched — but only
+            // while that stays a sane number of rows. A one-letter query matches
+            // most of the catalog, and expanding every company then paints
+            // ~1500 buttons on each keystroke; past the limit the companies stay
+            // closed with their counts, which is the more useful view anyway.
+            const searching = !!q.trim() || brandFilter !== "all";
+            const forced = searching && palView.total <= EXPAND_LIMIT;
+            const anyHit = palView.cos.length > 0;
+            const rows = palView.cos.map((co) => {
+              const { cats, total } = co;
               const coOpen = forced || !!openGroups[co.brand];
               return (
                 <div key={co.brand} style={{ marginBottom: 8 }}>
@@ -1554,10 +1572,21 @@ export default function BeckhoffConfigurator() {
                 </div>
               );
             });
-            return anyHit ? rows : (
+            if (!anyHit) return (
               <div style={{ fontSize: 12, color: C.muted, padding: "6px 2px" }}>
                 Nothing matches that search and filter combination.
               </div>
+            );
+            return (
+              <>
+                {searching && !forced && (
+                  <div style={{ fontSize: 11, color: C.muted, margin: "-2px 0 8px", lineHeight: 1.4 }}>
+                    {palView.total} matches in {palView.cos.length} {palView.cos.length === 1 ? "company" : "companies"} —
+                    open one, or narrow the search to expand them automatically.
+                  </div>
+                )}
+                {rows}
+              </>
             );
           })()}
         </aside>
@@ -2700,9 +2729,12 @@ function TopologyModal({ rails, free, onClose }) {
     return { stations: out, strays: stray };
   }, [rails]);
 
+  // free-placed devices that sit on the EtherCAT network: the kinds that are
+  // EtherCAT by construction, plus anything from the ETG directory — every
+  // product in it is an EtherCAT device, whatever face it borrows to draw
   const ecFree = useMemo(() => (free || [])
     .map((f) => ({ f, d: byId[f.catId] }))
-    .filter((x) => x.d && ["epbox", "iol", "iolhub", "drive", "linaxis"].includes(x.d.kind)), [free]);
+    .filter((x) => x.d && (x.d.etg || ["epbox", "iol", "iolhub", "drive", "linaxis"].includes(x.d.kind))), [free]);
 
   // TwinCAT's online topology draws one box per slave top-down: the frame enters
   // a station at the coupler, runs the E-bus terminals in order, leaves over

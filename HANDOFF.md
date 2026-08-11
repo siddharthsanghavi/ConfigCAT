@@ -178,6 +178,16 @@ has caught real "ports outside the body" bugs).
   coupler/CX-fed segment before the end cover; threaded `TerminalG →
   ElFace` as `powered`, which gates `ledStates`. Couplers/PSUs keep their
   own LEDs. Diagram's `TerminalG` uses the `powered=true` default.
+- **Two bugs found by testing the above (2026-08-11)**:
+  (a) a search auto-expanded every matching company, so a one-letter query
+  painted ~1535 palette buttons per keystroke. `palView` now precomputes
+  the filtered tree and expansion only happens under `EXPAND_LIMIT` (250)
+  matches; past that the companies stay closed with a "N matches in M
+  companies" hint. (b) `ecFree` in `TopologyModal` picked field devices by
+  `kind`, so imported gateways, switches, FSoE boxes, sensors and valve
+  manifolds never appeared on the network view — it now also accepts any
+  part with `d.etg`, since everything in the ETG directory is an EtherCAT
+  device whatever face it borrows.
 - **Palette tree (2026-08-11)**: the palette is company → category → part
   (`palTree` in App.jsx), not the flat `GROUPS` list it used to render.
   `GROUPS` is now the *category source*: whichever group a part is listed
