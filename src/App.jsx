@@ -229,6 +229,7 @@ function autoWireType(A, B) {
 }
 
 /* ---- persistence ---------------------------------------------------- */
+const APP_VERSION = "0.1";
 const STORE_KEY = "beckhoff-configurator-v1";        // the working doc (autosaved)
 const LIB_KEY = "beckhoff-configurator-library-v1";  // named in-browser saves
 const FILE_TAG = "sids-ethercat-configurator";
@@ -770,6 +771,7 @@ export default function BeckhoffConfigurator() {
   const [detail, setDetail] = useState(null);
   const [diagOpen, setDiagOpen] = useState(false);
   const [topoOpen, setTopoOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   // palette folders: keyed by company, and by `company/category` for subfolders
   const [openGroups, setOpenGroups] = useState({ beckhoff: true, "beckhoff/cplr": true });
   const svgRef = useRef(null);
@@ -1431,6 +1433,7 @@ export default function BeckhoffConfigurator() {
         <div style={S.brandBlock}>
           <span style={S.brandMark}>SID'S</span>
           <span style={S.brandSub}>EtherCAT Configurator</span>
+          <span style={S.brandVer}>v{APP_VERSION}</span>
         </div>
         <div style={S.headerActions}>
           <button style={{ ...S.btnGhost, opacity: past.length ? 1 : 0.4 }} disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)">↶</button>
@@ -1457,6 +1460,8 @@ export default function BeckhoffConfigurator() {
           <button style={S.btnGhost} onClick={() => setDiagOpen(true)} title="Generate a compact electrical connection diagram">Diagram</button>
           <button style={S.btnGhost} onClick={() => setTopoOpen(true)} title="Show the EtherCAT network topology (master → couplers → terminals → next station)">Topology</button>
           <button style={S.btnGhost} onClick={() => { update(() => ({ name: DEF_NAME, rails: [{ id: "r1", items: [] }], wires: [], free: [] })); setSelected(null); setPending(null); setSelWire(null); setActiveRail(0); }}>Clear all</button>
+          <button style={S.btnGhost} onClick={() => setAboutOpen(true)}
+            title="Version, data sources, trademarks and accuracy notice">About</button>
         </div>
       </header>
 
@@ -1883,7 +1888,9 @@ export default function BeckhoffConfigurator() {
                       ? "This is a product family, not an orderable part number — pick the exact model from the vendor."
                       : "Part number as listed in the directory."}
                     {" "}Size, channel count and pinout are representative defaults, not the vendor's data sheet.
-                    {selD.etgCert ? " Listed as ETG-certified." : " Not listed as ETG-certified."}
+                    {selD.etgCert
+                      ? " Listed as certified in the ETG product guide."
+                      : " Certification status is not listed in the ETG product guide (the guide is incomplete; this is not a statement that the product is uncertified)."}
                   </div>
                 )}
                 {selD.desc && <div style={S.inspDesc}>{selD.desc}</div>}
@@ -1995,6 +2002,7 @@ export default function BeckhoffConfigurator() {
 
       {diagOpen && <DiagramModal rails={rails} free={free} wires={wires} layout={layout} onClose={() => setDiagOpen(false)} />}
       {topoOpen && <TopologyModal rails={rails} free={free} onClose={() => setTopoOpen(false)} />}
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {projOpen && (
         <ProjectsModal library={library} current={projName} doc={doc}
           onSave={libSave} onOpen={libOpen} onDelete={libDelete} onRename={libRename}
@@ -2600,6 +2608,49 @@ const ROLE_COLOR = {
   p24: "#C4262E", gnd: "#23262A", pe: "#1E8A3C", ac: "#8A5A2B",
   di: "#F2B705", do: "#E8503A", ai: "#25A37A", ao: "#2F80ED", agnd: "#7FA8B8",
 };
+
+/* --- About: the disclaimers have to ship INSIDE the single HTML file, because
+ * that file is what gets downloaded and passed around, and nothing in the repo
+ * travels with it. --------------------------------------------------------- */
+function AboutModal({ onClose }) {
+  const P = { fontSize: 12.5, lineHeight: 1.5, margin: "0 0 10px", color: C.ink };
+  return (
+    <div style={S.modalWrap} onClick={onClose}>
+      <div style={{ ...S.modal, width: 560, maxWidth: "94vw" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ ...S.inspId, fontSize: 16 }}>Sid&apos;s EtherCAT Configurator v{APP_VERSION}</span>
+          <button style={S.btnGhost} onClick={onClose}>&#10005; Close</button>
+        </div>
+        <p style={P}>
+          A design aid and learning tool &mdash; <b>not an engineering or procurement system</b>.
+          Verify everything against the manufacturer&apos;s data sheet before using it for real
+          design, ordering or installation. Use at your own risk.
+        </p>
+        <p style={P}>
+          <b>Independent project.</b> Not affiliated with, authorised, endorsed or sponsored by
+          Beckhoff Automation, the EtherCAT Technology Group, or any other company named here.
+          All company names, product names and part numbers are trademarks of their respective
+          owners, used for identification only. EtherCAT&reg; is a registered trademark and
+          patented technology licensed by Beckhoff Automation GmbH. No company logos or product
+          photographs are reproduced: device drawings are original stylised SVG and manufacturer
+          badges are plain name-in-colour wordmarks.
+        </p>
+        <p style={P}>
+          <b>Catalog data.</b> Beckhoff entries are the most accurate; other parts are
+          representative models with approximate specs. Entries marked as coming from the
+          <b> EtherCAT Technology Group product guide</b> (ethercat.org/en/products.html) are
+          member-submitted listings: ETG assumes no responsibility for their content, correctness,
+          completeness or quality, and the guide is incomplete. Sizes, channel counts and pinouts
+          for those parts are representative defaults chosen per product type, not vendor data.
+        </p>
+        <p style={{ ...P, color: C.muted, margin: 0 }}>
+          Code and original artwork are MIT licensed. The licence covers neither third-party
+          trademarks and product names nor third-party catalog data.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /* --- in-browser project library: named saves in localStorage, so a design
  * survives a reload without juggling JSON files. Files remain the way to move
@@ -3684,6 +3735,7 @@ const S = {
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 20px", borderBottom: `1px solid ${C.line}`, background: C.panel },
   brandBlock: { display: "flex", flexDirection: "column", lineHeight: 1.15 },
   brandMark: { fontWeight: 800, letterSpacing: "0.14em", color: C.brand, fontSize: 15 },
+  brandVer: { fontSize: 10.5, fontWeight: 700, color: C.muted, marginLeft: 6, letterSpacing: "0.04em" },
   brandSub: { fontSize: 12, color: C.muted },
   headerActions: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", rowGap: 8 },
   btnGhost: { border: `1px solid ${C.line}`, background: C.panel, color: C.ink, padding: "7px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontWeight: 500 },

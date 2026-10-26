@@ -1,12 +1,24 @@
 # Generates src/catalog-etg.js from the ETG product-directory CSV.
 # Only placeable hardware is imported; every entry reuses an existing `kind`
 # so it renders with a real face and real connection points.
-import csv, io, re, json, collections, pathlib
+import csv, io, re, json, collections, pathlib, sys
 
-#   python scripts/gen-etg.py      (from the repo root; rewrites src/catalog-etg.js)
+#   python scripts/gen-etg.py [path/to/ethercat_products.csv]
+#
+# The source CSV is NOT shipped in this repo. It is an export of the EtherCAT
+# Technology Group product guide (https://www.ethercat.org/en/products.html),
+# whose listings are submitted by ETG member companies; ETG holds only a
+# non-transferable right to publish them, so they are not ours to redistribute.
+# Export your own copy (columns: Company, Product, Category, Type, Certified,
+# URL) and pass the path, or drop it at scripts/ethercat_products.csv, which is
+# gitignored. src/catalog-etg.js is committed, so the app builds without it.
 REPO = pathlib.Path(__file__).resolve().parent.parent
-CSV = REPO / "scripts" / "ethercat_products.csv"
+CSV = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / "scripts" / "ethercat_products.csv"
 OUT = REPO / "src" / "catalog-etg.js"
+if not CSV.exists():
+    sys.exit("source CSV not found: " + str(CSV) + " -- export the ETG product guide to "
+             "CSV and pass its path, or place it at scripts/ethercat_products.csv "
+             "(gitignored). See the note at the top of this file.")
 
 # ---- Type -> how the part is modelled ------------------------------------
 # kind must already have a freeGeom + FreeCompG case, or it draws as a
@@ -119,9 +131,9 @@ for r in rows:
     full = re.sub(r"\s+", " ", r["Product"]).strip()
     name = full if len(full) <= 58 else full[:57].rstrip() + "…"
     cert = r["Certified"].strip().lower() == "yes"
-    desc = f"{typ} · {company}. " + ("ETG-certified device. " if cert else "") + \
+    desc = f"{typ} · {company}. " + ("Listed as certified in the ETG product guide. " if cert else "") + \
            ("PRODUCT FAMILY, not an orderable part number — pick the exact model from the vendor. " if family else "") + \
-           "From the EtherCAT Technology Group product directory — representative geometry and pinout, no vendor data sheet applied."
+           "Listing from the EtherCAT Technology Group product guide, which is member-submitted and incomplete; ETG warrants no part of it. Geometry and pinout here are representative defaults, not the vendor's data sheet."
 
     e = {"id": pid, "brand": bkey, "name": name, "fn": spec["fn"], "free": True,
          "kind": spec["kind"], "fw": spec["fw"], "fh": spec["fh"],
@@ -151,6 +163,13 @@ lines = ['/* EtherCAT Technology Group product directory — generated from',
          ' * manifolds, panels. Training, dev tools, soft-PLCs, stacks, evaluation',
          ' * kits and passive connectors are NOT imported — they have no connection',
          ' * points, which every catalog part must have.',
+         ' *',
+         ' * SOURCE / ATTRIBUTION: listings come from the EtherCAT Technology Group',
+         ' * product guide (https://www.ethercat.org/en/products.html). They are',
+         ' * submitted by ETG member companies; ETG assumes no responsibility for',
+         ' * their content, correctness, completeness or quality, and the guide is',
+         ' * incomplete. Company and product names are trademarks of their respective',
+         ' * owners, used here for identification only.',
          ' *',
          ' * IMPORTANT: the directory carries no electrical data. Geometry, channel',
          ' * counts and pinouts here are REPRESENTATIVE defaults chosen per product',

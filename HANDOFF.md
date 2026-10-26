@@ -178,6 +178,17 @@ has caught real "ports outside the body" bugs).
   coupler/CX-fed segment before the end cover; threaded `TerminalG →
   ElFace` as `powered`, which gates `ledStates`. Couplers/PSUs keep their
   own LEDs. Diagram's `TerminalG` uses the `powered=true` default.
+- **v0.1 — licence & disclaimers (2026-10-26)**: version set to 0.1
+  (`APP_VERSION` in App.jsx, `package.json`, lockfile root). Added an
+  in-app **About** dialog (`AboutModal`) carrying the non-affiliation,
+  trademark, accuracy and ETG-attribution notices, because the single HTML
+  file is what people share and the README does not travel with it. The
+  inspector no longer claims a part is "Not listed as ETG-certified"
+  (a negative conformance claim about a named product, from a guide ETG
+  calls incomplete); it now says certification status is not listed and
+  that this is not a statement the product is uncertified. Added `NOTICE`
+  and extended the LICENSE scope note so MIT explicitly excludes
+  third-party catalog data.
 - **Two bugs found by testing the above (2026-08-11)**:
   (a) a search auto-expanded every matching company, so a one-letter query
   painted ~1535 palette buttons per keystroke. `palView` now precomputes
@@ -202,9 +213,13 @@ has caught real "ports outside the body" bugs).
   GROUPS entries — that also fixed generic `box` parts with `fn: "net"`
   (gateways, media converters) filing into Switching & Protection.
 - **ETG directory import (2026-08-11)**: `src/catalog-etg.js` is generated
-  by `scripts/gen-etg.py` from `scripts/ethercat_products.csv` (ETG product
-  directory, 1423 rows) — **never hand-edit it**; change the script and
-  rerun. 893 parts + 259 vendor wordmarks. The generated data dictates no
+  by `scripts/gen-etg.py` from an ETG product-directory export (1423 rows)
+  — **never hand-edit it**; change the script and rerun it against your own
+  export (`python scripts/gen-etg.py <csv>`). The export itself is **not in
+  the repo** (removed in v0.1 and gitignored): ETG holds only a
+  non-transferable right to publish member listings, so they are not ours
+  to redistribute — see NOTICE. Note it is still present in git history at
+  `d2b7d7c` and `ae52342`. 893 parts + 259 vendor wordmarks. The generated data dictates no
   layout at all: `etg` holds the plain-language device type ("Servo
   drive"), which marks the part as a directory import (the **SRC** filter
   is `!d.etg` / `d.etg`) and is matched by the palette search along with

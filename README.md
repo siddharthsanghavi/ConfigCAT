@@ -1,4 +1,4 @@
-# Sid's EtherCAT Configurator
+# Sid's EtherCAT Configurator — v0.1
 
 A single-file, offline web app for visually laying out Beckhoff EtherCAT
 stations and multi-vendor control panels — place devices, wire them with
@@ -7,6 +7,11 @@ materials, a wiring diagram, and a TwinCAT-style device list.
 
 No install, no server, no account. Open one HTML file in a browser.
 
+> **Design aid, not an engineering tool.** Specs are partly approximate and
+> partly representative defaults — see [Status & accuracy](#status--accuracy)
+> and [Data sources & attribution](#data-sources--attribution) before relying
+> on anything here.
+
 ---
 
 ## Quick start
@@ -14,7 +19,9 @@ No install, no server, no account. Open one HTML file in a browser.
 **Just want to use it?** Download **`Sids-EtherCAT-Configurator.html`**
 from this repo and double-click it. It runs fully offline in any modern
 browser (Chrome, Edge, Firefox, Safari). Your work autosaves in the
-browser; use **Save/Load** to keep project files.
+browser; use **Projects** to keep named designs in the browser, or
+**Save file / Import** to move a design between machines as JSON. The
+**About** button in the app carries the same notices as this README.
 
 **Want to develop it?**
 
@@ -34,22 +41,29 @@ cp dist/index.html Sids-EtherCAT-Configurator.html
 
 ## Features
 
-- **~660-part catalog** across 21 manufacturers, all connectable —
-  couplers, embedded/industrial PCs, panels, drives & motors, the full
-  Beckhoff EL/EP terminal families, plus representative sensors,
-  operators, contactors/breakers, disconnects, power supplies,
-  distribution, safety devices, pneumatics, IP67 I/O and IO-Link masters.
-- **Manufacturer filter** and searchable, collapsible palette.
+- **~1,550-part catalog across 281 manufacturers**, all connectable:
+  - ~660 hand-curated parts from 22 manufacturers — couplers,
+    embedded/industrial PCs, panels, drives & motors, the full Beckhoff
+    EL/EP terminal families, plus representative sensors, operators,
+    contactors/breakers, disconnects, power supplies, distribution,
+    safety devices, pneumatics, IP67 I/O and IO-Link masters;
+  - 893 devices listed in the **EtherCAT Technology Group product guide**
+    (drives, I/O systems, sensors, gateways, FSoE safety devices, valve
+    manifolds, panels) — see [Data sources](#data-sources--attribution).
+- **Palette by company → category** (Couplers, Digital Input, Drives &
+  Motors, Sensors, Signaling…), with manufacturer and source filters and a
+  search that matches part number, name, manufacturer and device type.
 - **Smart wiring** — press two connection points and the correct cable is
   chosen automatically from what they are; incompatible pairs are blocked.
 - **Cable highlighting** — EtherCAT cables glow, Safety-over-EtherCAT
   (FSoE) blinks yellow, IO-Link blinks blue.
 - **Validation** — rail structure, E-bus & power-contact budgets,
   potential groups, PSU sizing, Hot-Connect IDs, and wiring faults.
-- **Motion animation** — motors/drives/axes move once wired to power+data.
-- **Device variants** — inspector dropdown (e.g. `EP6224-0002 / -0092`).
+- **EtherCAT topology view** in the style of the TwinCAT online topology,
+  drawing a link only where devices physically touch.
+- **Projects** — named saves in the browser, plus JSON save/import.
 - **Exports** — Excel BOM (spreadsheet), PDF wiring diagram, PNG of the
-  panel, and a TwinCAT-style XML device list.
+  panel and of the topology, and a TwinCAT-style XML device list.
 
 See **[FEATURES.md](FEATURES.md)** for the full list and roadmap.
 
@@ -60,12 +74,15 @@ Sids-EtherCAT-Configurator.html   prebuilt standalone app (the deliverable)
 index.html                        Vite entry
 src/
   App.jsx                         UI, geometry, faces, wiring, exports
-  catalog.js                      core parts + palette groups
+  catalog.js                      core parts + category groups
   catalog-extended.js             bulk catalog expansion
+  catalog-etg.js                  GENERATED from the ETG product guide
   validate.js                     station & wiring validation
   main.jsx
+scripts/
+  gen-etg.py                      regenerates src/catalog-etg.js
 package.json  vite.config.js
-FEATURES.md   HANDOFF.md   CLAUDE.md    docs
+LICENSE  NOTICE  FEATURES.md  HANDOFF.md  CLAUDE.md
 ```
 
 `HANDOFF.md` is the developer's deep-dive (architecture, data model, and
@@ -84,30 +101,68 @@ procurement system.
 
 - **Beckhoff** data is the most accurate; several values were checked
   against Beckhoff's public documentation.
-- **Third-party** parts are *representative* real model families with
-  **approximate** electrical specs — verify against the manufacturer's
-  datasheet before using any of it for real design or ordering.
+- **Other hand-curated** parts are *representative* real model families
+  with **approximate** electrical specs.
+- **ETG product-guide** parts are the loosest: vendor, product name,
+  listing category, certification listing and link are taken from the
+  guide, but the guide carries no electrical data, so their sizes,
+  channel counts and pinouts are **representative defaults per product
+  type**. Many listings are product families rather than orderable part
+  numbers, and the app marks those.
 - Component drawings are original **stylized** SVG, not renders of
   specific products.
+
+Verify everything against the manufacturer's datasheet before using any
+of it for real design, ordering or installation.
+
+## Data sources & attribution
+
+893 catalog entries are derived from the **EtherCAT Technology Group
+(ETG) product guide** at
+[ethercat.org/en/products.html](https://www.ethercat.org/en/products.html).
+Listings in that guide are submitted by ETG member companies. Per ETG's
+[Guidelines for the EtherCAT Product Guide](https://www.ethercat.org/download/documents/EtherCAT_Product_Guide_Guidelines_EN.pdf),
+ETG assumes no responsibility for the content, correctness, completeness
+or quality of that material, and liability lies with the member company.
+The guide is also, by ETG's own description, incomplete.
+
+What that means here:
+
+- Only identification data is used: company, product name, listing
+  category and type, the certification listing, and a link back to the
+  ETG page. No product texts, photos or graphics from the guide are
+  reproduced.
+- "Listed as certified in the ETG product guide" reports the guide's
+  listing at the time of export. Where no certification is listed, the app
+  says only that — it is **not** a statement that a product is
+  uncertified.
+- **The source export is not redistributed in this repository.** ETG holds
+  only a non-transferable right to publish member listings, so they are
+  not ours to relicense. `scripts/gen-etg.py` documents how to regenerate
+  `src/catalog-etg.js` from your own export.
+- The ETG data is not covered by this project's MIT licence — see
+  [NOTICE](NOTICE).
 
 ## Trademarks & disclaimer
 
 This project is an independent, non-commercial tool and is **not
-affiliated with, authorized, endorsed by, or sponsored by** Beckhoff or
-any other company named in the catalog.
+affiliated with, authorized, endorsed by, or sponsored by** Beckhoff, the
+EtherCAT Technology Group, or any other company named in the catalog.
 
 All company names, product names, and part numbers (Beckhoff, EtherCAT®,
 TwinCAT, TwinSAFE, WAGO, Murr Elektronik, Banner, Eaton, Balluff, SMC,
 Festo, igus, Leuze, Siemens, Phoenix Contact, SICK, Turck, ifm, Pilz,
-Schneider Electric, Kollmorgen, Omron, AutomationDirect, Weidmüller, and
-others) are **trademarks or registered trademarks of their respective
-owners**, used here **for identification and interoperability reference
-only**. EtherCAT® is a registered trademark and patented technology
-licensed by Beckhoff Automation GmbH.
+Schneider Electric, Kollmorgen, Omron, AutomationDirect, Weidmüller, the
+further manufacturers listed in the ETG product guide, and others) are
+**trademarks or registered trademarks of their respective owners**, used
+here **for identification and interoperability reference only**.
+EtherCAT® is a registered trademark and patented technology licensed by
+Beckhoff Automation GmbH.
 
 No company logos or product photographs are reproduced. Manufacturer
 "badges" in the app are plain name-in-color wordmarks for identification.
 Part numbers and specifications are representative and may be inaccurate.
 
 Use at your own risk. See [LICENSE](LICENSE) (MIT) for the terms covering
-the original code and artwork.
+the original code and artwork, and [NOTICE](NOTICE) for what it does not
+cover.

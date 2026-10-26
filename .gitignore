@@ -20,3 +20,7 @@ Thumbs.db
 # local env
 .env
 .env.local
+
+# ETG product-guide export: source data for scripts/gen-etg.py. Not ours to
+# redistribute (see NOTICE) -- keep your own copy here, never commit it.
+scripts/ethercat_products.csv

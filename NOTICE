@@ -1,0 +1,33 @@
+Sid's EtherCAT Configurator
+Copyright (c) 2026 Sid
+
+The MIT License in LICENSE applies to the original source code and original
+artwork in this repository. It does NOT apply to the following, which remain
+the property of their respective owners and are not relicensed by this
+project:
+
+1. Third-party trademarks, company names, product names and part numbers.
+   Beckhoff, EtherCAT, EtherCAT P, Safety over EtherCAT, TwinCAT, TwinSAFE
+   and every other company or product name in the catalog are trademarks or
+   registered trademarks of their respective owners, used for identification
+   and interoperability reference only. EtherCAT(R) is a registered trademark
+   and patented technology licensed by Beckhoff Automation GmbH.
+
+2. EtherCAT Technology Group product-guide data.
+   src/catalog-etg.js contains identification data (company, product name,
+   listing category and type, certification listing, and a link to the ETG
+   page) derived from the EtherCAT Technology Group product guide,
+   https://www.ethercat.org/en/products.html. Listings in that guide are
+   submitted by ETG member companies. ETG assumes no responsibility for the
+   content, correctness, completeness or quality of that material, and the
+   guide is incomplete. No product texts, photos or graphics from the guide
+   are reproduced, and the source export itself is not distributed with this
+   repository; scripts/gen-etg.py documents how to regenerate the file from
+   your own export.
+
+This project is independent and is not affiliated with, authorized, endorsed
+or sponsored by Beckhoff Automation, the EtherCAT Technology Group, or any
+other company named in it.
+
+All specifications are approximate or representative and may be inaccurate.
+Verify against the manufacturer's data sheet before any real use.

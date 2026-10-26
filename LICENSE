@@ -24,5 +24,7 @@ SOFTWARE.
 
 Note: This license covers the source code and original artwork in this
 repository only. It does not grant any rights in third-party trademarks or
-product names referenced by the application. See the "Trademarks & disclaimer"
-section of README.md.
+product names referenced by the application, nor in third-party catalog data,
+including the listings derived from the EtherCAT Technology Group product
+guide in src/catalog-etg.js. See NOTICE and the "Data sources & attribution"
+and "Trademarks & disclaimer" sections of README.md.

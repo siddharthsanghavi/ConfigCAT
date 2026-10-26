@@ -19,8 +19,11 @@ work via the portable dist; call vite through `node` directly.
 
 ## Architecture
 - `src/catalog-etg.js` — **generated, do not hand-edit.** 893 devices from
-  the EtherCAT Technology Group product directory (`scripts/gen-etg.py`
-  + `scripts/ethercat_products.csv`; rerun `python scripts/gen-etg.py`).
+  the EtherCAT Technology Group product directory (`scripts/gen-etg.py`,
+  run against **your own** ETG export: `python scripts/gen-etg.py <csv>`).
+  The source CSV is **never committed** — ETG member listings are not ours
+  to redistribute (see NOTICE); `scripts/ethercat_products.csv` is
+  gitignored for exactly that reason.
   Placeable hardware only; the directory has no electrical data, so
   geometry / channels / pinouts are **representative defaults per product
   type**, flagged in the UI. `etg` = device type (searchable, and the flag
