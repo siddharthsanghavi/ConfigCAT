@@ -12,6 +12,44 @@ No install, no server, no account. Open one HTML file in a browser.
 > and [Data sources & attribution](#data-sources--attribution) before relying
 > on anything here.
 
+![A wired two-station cell: TwinSAFE group, EtherCAT chained through a servo drive, IP67 box and valve terminal](docs/images/hero.png)
+
+## Screenshots
+
+Every image below is generated from the real app by
+[`scripts/shots`](scripts/shots/) — see [Regenerating screenshots](#regenerating-screenshots).
+
+**Wiring.** Press two connection points and the right cable is chosen for you.
+![Wire tool mid-connection](docs/images/wiring.png)
+
+**Electrical connection diagram**, exportable as PDF with a cable schedule.
+![Electrical connection diagram](docs/images/diagram.png)
+
+<table>
+<tr>
+<td width="56%" valign="top">
+<b>EtherCAT topology</b> in the style of TwinCAT — E-bus and RJ45 links, a
+junction drop line, and devices that are not on the network.<br><br>
+<img src="docs/images/topology.png" alt="EtherCAT topology view">
+</td>
+<td valign="top">
+<b>Projects</b> saved in the browser, plus JSON save and import.<br><br>
+<img src="docs/images/projects.png" alt="Project library"><br><br>
+<b>About</b> carries the licence, trademark and data-source notices inside the app.<br><br>
+<img src="docs/images/about.png" alt="About dialog">
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td width="25%" valign="top"><b>Palette</b> by company, then category.<br><br><img src="docs/images/palette.png" alt="Palette tree"></td>
+<td width="25%" valign="top"><b>Search</b> — one company folder holds curated and ETG-directory parts.<br><br><img src="docs/images/search.png" alt="Search results"></td>
+<td width="25%" valign="top"><b>Directory parts</b> say what is real and what is a default.<br><br><img src="docs/images/etg-part.png" alt="ETG directory part in the inspector"></td>
+<td width="25%" valign="top"><b>Validation</b> catches structure and E-bus problems, with the fix.<br><br><img src="docs/images/validation.png" alt="Validation panel"></td>
+</tr>
+</table>
+
 ---
 
 ## Quick start
@@ -30,6 +68,23 @@ npm install
 npm run dev      # dev server with hot reload
 npm run build    # bundles everything into dist/index.html (self-contained)
 ```
+
+### Regenerating screenshots
+
+```bash
+npm run shots                          # every scene -> docs/images/ (2x, retina-sharp)
+npm run shots -- --only hero,topology  # just those
+npm run shots -- --labels hero         # list the connection points a scene can wire
+npm run shots -- --headed              # watch it drive the app
+```
+
+`scripts/shots/scenes.mjs` describes each scene as data: a design to load,
+then steps that drive the real interface — the wire tool (which picks every
+cable itself), header buttons, palette search and filters — and the region to
+capture. It runs against the built `Sids-EtherCAT-Configurator.html` through
+your installed Edge (`--browser chrome` for Chrome), refuses to run if that
+build is older than `src/`, and fails a scene outright if any wire it asks for
+is rejected, so the images can't silently drift from the app.
 
 The build inlines all JS/CSS into one HTML file
 (`vite-plugin-singlefile`), which is what makes the standalone file work
@@ -81,6 +136,8 @@ src/
   main.jsx
 scripts/
   gen-etg.py                      regenerates src/catalog-etg.js
+  shots/                          screenshot automation (shoot.mjs + scenes.mjs)
+docs/images/                      generated screenshots + shots.json manifest
 package.json  vite.config.js
 LICENSE  NOTICE  FEATURES.md  HANDOFF.md  CLAUDE.md
 ```

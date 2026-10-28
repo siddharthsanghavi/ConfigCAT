@@ -21,30 +21,22 @@ cable selection, validate the design, and export BOM/diagram/XML.
 - **Feature list:** `beckhoff/FEATURES.md` (also has the roadmap)
 
 ## Build & run (IMPORTANT)
-**Node.js is NOT installed on this machine.** A portable Node lives in the
-session scratchpad and disappears when the session ends. In a fresh
-session you must re-download it, or the user must install Node.
+As of 2026-10-28 Node 24 / npm 11 are installed system-wide and
+`node_modules` is a real install. (The old junction into
+`Documents\Claude\Beckhoff\node_modules` was removed with `cmd /c rmdir`,
+which deletes only the link — never `rm -rf` a junction from Git Bash, it can
+recurse into the target and empty the other project.)
 
 ```bash
-# if Node IS installed:  npm install && npm run build
-# otherwise (portable node), from the repo root:
-export PATH="<scratchpad>/node-v22.12.0-win-x64:$PATH"
-node node_modules/vite/bin/vite.js build     # builds dist/index.html
+npm install
+npm run build
 cp dist/index.html Sids-EtherCAT-Configurator.html
+npm run shots          # regenerate README screenshots (see below)
 ```
-- `npm` does **not** work via the portable dist here (npm.cmd missing /
-  npm-cli.js misbehaves). Install deps only if `node_modules` is missing.
-- As of 2026-08-10 this repo has **no `node_modules` of its own** — it is a
-  directory junction to `Documents\Claude\Beckhoff\node_modules` (same
-  dependency set, gitignored), created with
-  `cmd /c mklink /J <repo>\node_modules <that path>`. Recreate it if the
-  build cannot find vite. A surviving portable Node from an earlier session
-  was at `…\bb0d9880-…\scratchpad\node-v22.12.0-win-x64\node.exe`.
-- Dev server: `.claude/launch.json` points at the portable node + vite.
-  Its `runtimeExecutable` path contains the **session-specific scratchpad
-  id** — it will be stale in a new session and must be updated. The entry
-  actually used by the preview tool lives in the **primary working
-  directory's** `.claude/launch.json`, not this repo's.
+- npm 11 holds back install scripts; esbuild's postinstall is among them and
+  the build works without it, so nothing needs approving.
+- Dev server for the preview tool: the entry it reads lives in the
+  **primary working directory's** `.claude/launch.json`, not this repo's.
 - `vite-plugin-singlefile` inlines everything; `base: "./"` so `file://`
   works.
 
@@ -178,6 +170,29 @@ has caught real "ports outside the body" bugs).
   coupler/CX-fed segment before the end cover; threaded `TerminalG →
   ElFace` as `powered`, which gates `ledStates`. Couplers/PSUs keep their
   own LEDs. Diagram's `TerminalG` uses the `powered=true` default.
+- **Screenshot automation (2026-10-28)**: `scripts/shots/shoot.mjs` (engine)
+  + `scenes.mjs` (data) → `docs/images/*.png` and `shots.json`. Runs the
+  built HTML in the installed Edge via `playwright-core` (no bundled browser
+  download), at 2× device scale, and refuses to run if the build is older
+  than `src/`. A scene seeds `doc` / `library` into localStorage with
+  `addInitScript` before boot, then runs steps: `wire` / `wires` (the real
+  wire tool: `pointerdown` on point A then point B — the app's click-click
+  flow — dispatched straight to each point's element so a wire already
+  ending there can't intercept; each must add exactly one wire or the scene
+  fails), `pending`, `select`, `press` (button by label prefix), `search`,
+  `mfr`, `src`, `expand` (`"!Title"` closes), `scroll`, `expect`, `shot`.
+  Shots crop to `viewport` / `stage` / `palette` / `canvas` / `inspector` /
+  `modal`; before each it waits for toasts to clear, parks the mouse, and
+  freezes the SMIL cable animations on a fixed frame. `--labels <scene>`
+  lists every addressable point. The app gained inert `data-uid` /
+  `data-pt` / `data-label` attributes for this (gotcha 6 in CLAUDE.md).
+  Layout lessons baked into the scenes: the canvas grows to the rightmost
+  free device + 90 px, so the hero is 1680 wide or "remove rail" clips; the
+  validation issue list is a 190 px scroll box, so that scene stages three
+  short messages; the topology and diagram viewports are sized to their
+  modal. Reviewing the images surfaced one app nit, fixed: the inspector
+  repeated an ETG part's disclaimer (note + description), so the
+  description is now hidden for directory parts.
 - **v0.1 — licence & disclaimers (2026-10-26)**: version set to 0.1
   (`APP_VERSION` in App.jsx, `package.json`, lockfile root). Added an
   in-app **About** dialog (`AboutModal`) carrying the non-affiliation,

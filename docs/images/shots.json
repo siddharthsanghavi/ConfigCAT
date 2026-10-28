@@ -1,0 +1,85 @@
+{
+  "scale": 2,
+  "shots": [
+    {
+      "scene": "hero",
+      "file": "docs/images/hero.png",
+      "width": 3360,
+      "height": 2000,
+      "kb": 987,
+      "caption": "A wired two-station cell: TwinSAFE group, EtherCAT chained through a servo drive, IP67 box and valve terminal"
+    },
+    {
+      "scene": "wiring",
+      "file": "docs/images/wiring.png",
+      "width": 2760,
+      "height": 844,
+      "kb": 426,
+      "caption": "Wire tool mid-connection — press two points and the right cable is chosen for you"
+    },
+    {
+      "scene": "topology",
+      "file": "docs/images/topology.png",
+      "width": 1764,
+      "height": 2200,
+      "kb": 175,
+      "caption": "EtherCAT topology in the style of TwinCAT: E-bus and RJ45 links, a junction drop line, and devices that are not on the network"
+    },
+    {
+      "scene": "diagram",
+      "file": "docs/images/diagram.png",
+      "width": 3654,
+      "height": 1128,
+      "kb": 403,
+      "caption": "Electrical connection diagram, exportable as PDF with a cable schedule"
+    },
+    {
+      "scene": "palette",
+      "file": "docs/images/palette.png",
+      "width": 488,
+      "height": 1440,
+      "kb": 87,
+      "caption": "Palette by company, then category"
+    },
+    {
+      "scene": "search",
+      "file": "docs/images/search.png",
+      "width": 488,
+      "height": 1040,
+      "kb": 61,
+      "caption": "One company folder holds curated parts and ETG-directory parts side by side"
+    },
+    {
+      "scene": "etg-part",
+      "file": "docs/images/etg-part.png",
+      "width": 600,
+      "height": 1400,
+      "kb": 90,
+      "caption": "Every ETG-directory part says what is real (vendor, listing, link) and what is a representative default"
+    },
+    {
+      "scene": "validation",
+      "file": "docs/images/validation.png",
+      "width": 600,
+      "height": 1032,
+      "kb": 73,
+      "caption": "Validation catches rail-structure and E-bus budget problems as you build, and says how to fix them"
+    },
+    {
+      "scene": "projects",
+      "file": "docs/images/projects.png",
+      "width": 1312,
+      "height": 694,
+      "kb": 114,
+      "caption": "Named projects saved in the browser, plus JSON save and import"
+    },
+    {
+      "scene": "about",
+      "file": "docs/images/about.png",
+      "width": 1192,
+      "height": 816,
+      "kb": 177,
+      "caption": "The About dialog ships the licence, trademark and data-source notices inside the app"
+    }
+  ]
+}

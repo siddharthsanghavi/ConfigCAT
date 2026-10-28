@@ -1893,7 +1893,8 @@ export default function BeckhoffConfigurator() {
                       : " Certification status is not listed in the ETG product guide (the guide is incomplete; this is not a statement that the product is uncertified)."}
                   </div>
                 )}
-                {selD.desc && <div style={S.inspDesc}>{selD.desc}</div>}
+                {/* a directory part's description only repeats the note above */}
+                {selD.desc && !selD.etg && <div style={S.inspDesc}>{selD.desc}</div>}
                 <div style={S.inspMeta}>
                   <span>{FN[selD.fn].label}</span>
                   <span>{selD.free ? "free-placed — drag to move" : `${selD.ebus > 0 ? `+${selD.ebus}` : selD.ebus} mA E-bus`}</span>
@@ -2327,7 +2328,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
 
   return (
-    <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`}
+    <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
       opacity={dragging ? 0.45 : 1}
       onClick={(e) => { if (!wireMode) { e.stopPropagation(); onSelect(); } }}
       onDoubleClick={(e) => { if (!wireMode && onDetail) { e.stopPropagation(); onDetail(); } }}
@@ -2371,9 +2372,12 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
           onMouseEnter: () => onHover(uid, i),
           onMouseLeave: onLeave,
         };
+        // inert addressing for automation (scripts/shots): device uid on the
+        // root group, point index + label here
+        const ptData = { "data-pt": i, "data-label": p.label };
         if (p.port) {
           return (
-            <g key={i} {...ptHandlers} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
               {isPending && <rect x={p.x - 21} y={p.y - 17} width="42" height="34" rx="3" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
               <rect x={p.x - 20} y={p.y - 16} width="40" height="32" fill="transparent">
                 <title>{pointRole(d, p)}</title>
@@ -2382,7 +2386,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
           );
         }
         return (
-          <g key={i} {...ptHandlers} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+          <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
             <ClampUnit x={p.x} y={p.y} size={p.size} hl={isPending} />
             <rect x={p.x - 9.5} y={p.y - p.size * 2.2 - 3} width="19" height={p.size * 3.6 + 6} fill="transparent">
               <title>{pointRole(d, p)}</title>
@@ -3659,7 +3663,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
   })();
 
   return (
-    <g transform={`translate(${t.x}, ${t.y})`}
+    <g transform={`translate(${t.x}, ${t.y})`} data-uid={uid}
       onClick={(e) => { if (!wireMode) { e.stopPropagation(); onSelect(); } }}
       onPointerDown={(e) => { if (!wireMode && onDragStart) onDragStart(e); }}
       style={{ cursor: wireMode ? "crosshair" : "grab" }}
@@ -3695,7 +3699,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
       {geom.pts.map((p, i) => {
         const isPending = pending && pending.uid === uid && pending.pt === i;
         return (
-          <g key={i}
+          <g key={i} data-pt={i} data-label={p.label}
             onPointerDown={(e) => { if (wireMode) { e.stopPropagation(); onPointDown(uid, i); } }}
             onPointerUp={(e) => { if (wireMode) { e.stopPropagation(); onPointUp(uid, i); } }}
             onMouseEnter={() => onHover(uid, i)} onMouseLeave={onLeave}

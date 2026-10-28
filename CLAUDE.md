@@ -8,14 +8,15 @@ selection, validate, and export BOM / diagram / XML.
 state. `FEATURES.md` lists every feature plus the roadmap.
 
 ## Deliverable
-`Sids-EtherCAT-Configurator.html` (repo root) — ~1.65 MB,
+`Sids-EtherCAT-Configurator.html` (repo root) — ~1.7 MB,
 self-contained, double-click to run offline. Rebuild after any change:
 ```bash
-node node_modules/vite/bin/vite.js build
+npm run build
 cp dist/index.html Sids-EtherCAT-Configurator.html
 ```
-**Node is not installed system-wide** — see HANDOFF.md. `npm` does not
-work via the portable dist; call vite through `node` directly.
+Node 24 is installed system-wide and `node_modules` is a real install
+(`npm install`). README screenshots come from `npm run shots` — rebuild
+first; it refuses to run against a stale build.
 
 ## Architecture
 - `src/catalog-etg.js` — **generated, do not hand-edit.** 893 devices from
@@ -75,6 +76,9 @@ work via the portable dist; call vite through `node` directly.
    endpoints are positional indexes and saved projects would re-wire.
 5. `sanitizeDoc` silently drops unknown `catId`s when loading a project,
    so renaming/removing a part deletes it from saved projects.
+6. `data-uid` (device root groups) and `data-pt` / `data-label` (connection
+   points) are inert in the app but are how `scripts/shots` addresses and
+   wires devices. Removing or renaming them breaks the screenshot scenes.
 
 ## Testing
 No test framework yet. Verify by: (a) the catalog integrity one-liner in

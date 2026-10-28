@@ -33,7 +33,7 @@ and exporting documentation. Deliverable: **`Sids-EtherCAT-Configurator.html`**
   second gapped group gets its own buses and nothing shows past a cover.
   Makes "what's connected to what" legible without wiring.
 
-## 2. Catalog (~660 parts, 21 manufacturers, all branded)
+## 2. Catalog (~1,550 parts, 281 manufacturers, all branded)
 - **Power sources / feeds**: incoming-supply blocks — **DC 12/24/48 V** and
   **1-phase 120/240/300 V** and **3-phase 208/240/400/480/600 V AC** — with
   the right terminals (DC +/−/PE, AC L·N·PE or L1·L2·L3·N·PE). Wireable to
@@ -205,6 +205,16 @@ brand's color) on its right side. Note: these are name-in-color badges,
 - **PNG** of the station, **PDF** wiring diagram, **XML** TwinCAT-style
   device list (variant-aware).
 - **Undo/redo** (Ctrl+Z/Y), duplicate, delete, Escape to cancel.
+
+## 10. Developer tooling
+- **Screenshot automation** — `npm run shots` regenerates every README
+  image from the real app at 2× (retina) scale. Scenes are plain data
+  (`scripts/shots/scenes.mjs`): a design to load, then steps that drive the
+  actual interface — wiring through the real wire tool, header buttons,
+  palette search and filters — and a region to capture. Every wire a scene
+  asks for must be accepted by the app's own cable rules, a stale build is
+  refused, and `--labels <scene>` lists every connection point a scene can
+  wire.
 
 ---
 
