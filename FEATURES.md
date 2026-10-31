@@ -240,6 +240,9 @@ brand's color) on its right side. Note: these are name-in-color badges,
 
 ## Roadmap / not yet done
 
+**v0.2 plan:** see [`docs/ROADMAP-v0.2.md`](docs/ROADMAP-v0.2.md) — electrical
+simulation, multimeter + oscilloscope, PLCSIM integration, TwinCAT connector.
+
 *Original items:*
 1. **Exhaustive catalog & variants** — the catalog is a broad
    representative set, not every SKU. A generated `catalog.json` scraped
