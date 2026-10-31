@@ -166,6 +166,8 @@ async function runStep(page, step, scene, results) {
       await setWireMode(page, true);
       return (await point(page, arg[0], arg[1])).dispatchEvent("pointerdown");
     case "select": return selectDevice(page, arg);
+    // operate a push-button, switch or sensor while Simulate is on
+    case "actuate": return page.locator(`main [data-uid="${arg}"]`).first().dispatchEvent("pointerdown");
     // by the start of the label, so "Projects" still finds "Projects (4)"
     case "press": return page.getByRole("button", { name: new RegExp(`^${escapeRe(arg)}`) }).first().click();
     case "search": return page.getByPlaceholder(/Search catalog/).fill(arg);

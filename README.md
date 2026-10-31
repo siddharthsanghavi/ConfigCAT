@@ -22,6 +22,12 @@ Every image below is generated from the real app by
 **Wiring.** Press two connection points and the right cable is chosen for you.
 ![Wire tool mid-connection](docs/images/wiring.png)
 
+**Simulate** *(v0.2, in development)*. A simulated EtherCAT master runs a
+Structured Text program over the drawing: the sensor turns on its input,
+the PLC switches an output, and the stack light comes on. Terminal, coupler and
+device LEDs all follow the live process image.
+![Simulation running: sensor input on, stack light red](docs/images/simulate.png)
+
 **Electrical connection diagram**, exportable as PDF with a cable schedule.
 ![Electrical connection diagram](docs/images/diagram.png)
 
@@ -116,6 +122,10 @@ cp dist/index.html Sids-EtherCAT-Configurator.html
   potential groups, PSU sizing, Hot-Connect IDs, and wiring faults.
 - **EtherCAT topology view** in the style of the TwinCAT online topology,
   drawing a link only where devices physically touch.
+- **Simulate** *(v0.2-dev)* — runs the design as a live EtherCAT station:
+  a TwinCAT, CODESYS or Omron Sysmac master (EtherCAT masters only), an ST
+  program, INIT→OP state machine, forcing, and a 24 V circuit solver behind
+  every LED, lamp, coil and short circuit. See [FEATURES §11](FEATURES.md#11-simulate-v02-dev).
 - **Projects** — named saves in the browser, plus JSON save/import.
 - **Exports** — Excel BOM (spreadsheet), PDF wiring diagram, PNG of the
   panel and of the topology, and a TwinCAT-style XML device list.
@@ -133,6 +143,8 @@ src/
   catalog-extended.js             bulk catalog expansion
   catalog-etg.js                  GENERATED from the ETG product guide
   validate.js                     station & wiring validation
+  sim/                            Simulate: station, circuit solver, PLC glue, panel
+  plcsim/                         PLC engine vendored from PLCSIM (EtherCAT-only)
   main.jsx
 scripts/
   gen-etg.py                      regenerates src/catalog-etg.js

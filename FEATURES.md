@@ -216,9 +216,58 @@ brand's color) on its right side. Note: these are name-in-color badges,
   refused, and `--labels <scene>` lists every connection point a scene can
   wire.
 
+## 11. Simulate (v0.2-dev)
+**▶ Simulate** in the header turns the drawing into a running station. Click
+push-buttons, selectors, E-stops, limit switches, sensors, breakers and
+disconnects on the canvas to operate them; the docked panel holds the rest.
+
+- **Master**: a CX on a rail, otherwise an IPC, otherwise TwinCAT 3 on the
+  engineering PC, assumed cabled to the first coupler whose X1 is free.
+  The runtime can be swapped for any **EtherCAT master**: Beckhoff TwinCAT
+  (CX7000…C6930, user mode), CODESYS EtherCAT Master SL (Windows, RTE,
+  Linux, ARM64, Raspberry Pi) or Omron Sysmac (NX1P2…NY5). Each runtime's
+  cycle time, scan cost and memory come from `src/plcsim/masters.js`. No
+  non-EtherCAT PLCs are included.
+- **Bus**: slaves are found by walking EtherCAT cabling from the master.
+  Each E-bus segment counts, as does each EP box, drive or valve terminal
+  with a bus port. Terminals before any coupler, and couplers nobody cabled,
+  stay off the bus and are reported. WKC is shown as live/expected.
+- **State machine**: INIT / PREOP (no process data), SAFEOP (inputs only,
+  outputs held off), OP. The coupler RUN LED follows it: on, flashing or
+  blinking.
+- **Program**: Structured Text with `PROGRAM`/`VAR … END_VAR` and
+  `name AT %IX0.3 : BOOL;` mapping. Every channel also gets an automatic
+  variable (`Term3_In1`, `Term4_Out2`…). Download with Ctrl+Enter. Compile
+  errors show their line. A fresh station gets an I/O-check program: each
+  output terminal mirrors the input terminal before it.
+- **I/O tab**: variable, %I/%Q address, live value and forcing (TRUE/FALSE
+  or an analog slider). An output that is commanded but not actually
+  driving says *not driven*.
+- **Electrical solver**: wires, power contacts (Up), coupler Us, feed and
+  break terminals, fuses, busbars and links, all solved as 24 V / 0 V nets.
+  Lamps, coils and sensors work only when really fed. Relay and contactor
+  contacts follow their coils. A DO shorted to 0 V trips and says so. Up
+  with no supply leaves outputs dark, with a message. A device whose supply
+  pins are all unwired is assumed fed from outside the drawing (Us only,
+  never Up).
+- **LEDs and faces**: terminal channel LEDs follow the verified pinout.
+  Coupler RUN/link/ERR/Us/Up, PSU DC OK, CX PWR/TC/ERR, stack light
+  segments and buzzer, sensor output/power, relay/contactor/valve/
+  valve-bank/EP-box channel LEDs, and breaker/disconnect handles all move.
+  Motors and axes animate when their drive is enabled. Energised wires glow
+  (red 24 V, orange AC, magenta short).
+- **Limits today**: TwinSAFE terminals act as plain DI/DO (no FSoE
+  watchdog). Analog inputs come only from the force slider. Relay-output
+  terminals (EL2622) and IO-Link process data are not modelled yet. Only
+  the ST editor is mounted; PLCSIM's ladder, FBD and SFC editors come later.
+
 ---
 
 ## Recently done
+- **Simulate** (v0.2-dev, §11): PLCSIM's engine inside the configurator,
+  with live I/O and LEDs.
+- **Fix: removing a rail** no longer drops the project name and every
+  free-placed device.
 - **FSoE realism fix** — Safety over EtherCAT now models the real black-
   channel behaviour: it rides only EtherCAT cabling + the E-bus backplane,
   requires both safe I/O and a TwinSAFE Logic, and never appears on field

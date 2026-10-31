@@ -164,6 +164,24 @@ export const SCENES = [
     ],
   },
   {
+    name: "simulate",
+    doc: CELL,
+    viewport: { width: 1680, height: 1260 },            // tall: the sim panel docks under the canvas
+    steps: [
+      { wires: CELL_WIRES },
+      { wire: [["f1", "+"], ["u20", "+"]] },          // the cell feeds only Us; outputs switch Up
+      { wire: [["f1", M], ["u20", M]] },
+      { wire: [["f7", "C"], ["f1", M]] },             // the stack light's common, or no lamp can light
+      { wireMode: false },
+      { press: "▶ Simulate" },
+      { expect: { text: "PLC RUN" } },
+      { actuate: "f4" },                                // the sensor sees its target
+      { wait: 400 },
+      { shot: { name: "simulate", region: "viewport",
+        caption: "Simulate: a TwinCAT master runs the I/O check program; the sensor lights its input LED, the stack light follows the output" } },
+    ],
+  },
+  {
     name: "palette",
     doc: CELL,
     steps: [

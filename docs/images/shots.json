@@ -6,7 +6,7 @@
       "file": "docs/images/hero.png",
       "width": 3360,
       "height": 2000,
-      "kb": 987,
+      "kb": 988,
       "caption": "A wired two-station cell: TwinSAFE group, EtherCAT chained through a servo drive, IP67 box and valve terminal"
     },
     {
@@ -32,6 +32,14 @@
       "height": 1128,
       "kb": 403,
       "caption": "Electrical connection diagram, exportable as PDF with a cable schedule"
+    },
+    {
+      "scene": "simulate",
+      "file": "docs/images/simulate.png",
+      "width": 3360,
+      "height": 2520,
+      "kb": 1135,
+      "caption": "Simulate: a TwinCAT master runs the I/O check program; the sensor lights its input LED, the stack light follows the output"
     },
     {
       "scene": "palette",

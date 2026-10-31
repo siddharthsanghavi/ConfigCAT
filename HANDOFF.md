@@ -47,6 +47,8 @@ npm run shots          # regenerate README screenshots (see below)
 | `src/catalog-extended.js` | `EXTRA` — bulk expansion (power sources, KL / WAGO 750, deeper vendor lines) |
 | `src/App.jsx` | Everything else: geometry, faces, wiring, validation UI, exports, diagram |
 | `src/validate.js` | `validateStation` / `validateWires` / `classifyPoint` |
+| `src/sim/` | Simulate (v0.2-dev): `station.js`, `electrical.js`, `plc.js`, `useSim.js`, `SimPanel.jsx` |
+| `src/plcsim/` | PLC engine vendored from PLCSIM @ 4e9dba6 + `masters.js` (EtherCAT master runtimes) |
 | `CLAUDE.md` | Architecture + conventions (project-level guidance) |
 
 ### App.jsx landmarks
@@ -305,6 +307,26 @@ has caught real "ports outside the body" bugs).
   keep their points inside the body. This also fixed the pre-existing narrow
   `EATON-EMS`. Containment re-verified (64 pts, 0 violations). 603 parts;
   integrity one-liner still clean.
+
+## Simulate (v0.2-dev, branch `v0.2-dev`)
+- Header **▶ Simulate** → `useSim` (src/sim/useSim.js). Every tick it solves
+  the circuit with last tick's outputs, copies DI levels into
+  `ctrl.io.inputs`, scans, reads `ctrl.io.outputs`, re-solves and publishes a
+  `view` (~30 Hz, only on change). Faces read `sim.term[uid]` /
+  `sim.dev[uid]`; wires read `sim.wires[id]` for the glow.
+- Sim state lives outside undo. Only `doc.plc = { code, runtime }` is
+  saved.
+- Actuating a device uses the same `onDragStart` path as dragging. In sim
+  mode it calls `actuate(uid)` instead (momentary: released on window
+  `pointerup`).
+- The solver is exact about Us vs Up: a coupler's `24V/0V` is Us only, and
+  outputs need `+/−` (Up) or a feed terminal. The CELL demo design only
+  feeds Us, so the `simulate` shot scene adds the Up wires and the stack
+  light's common.
+- Test by hand: seed `localStorage["beckhoff-configurator-v1"]`, toggle
+  the wire tool and dispatch `pointerdown` on `main [data-uid] [data-label]`
+  to wire, then dispatch `pointerdown` on `main [data-uid]` to actuate.
+  `npm run shots -- --only simulate` is the scripted check.
 
 ## Next steps (see FEATURES.md roadmap for the full list)
 1. **Catalog depth** — biggest open item. The user wants near-complete

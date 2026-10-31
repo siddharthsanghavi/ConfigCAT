@@ -39,6 +39,18 @@ first; it refuses to run against a stale build.
   An auto-assign block at the end files any unlisted part into the right
   palette group, so adding parts needs no GROUPS edit.
 - `src/validate.js` — `validateStation`, `validateWires`, `classifyPoint`.
+- `src/plcsim/` — PLC engine **vendored from the PLCSIM repo (commit
+  4e9dba6)**: `runtime.js` (`Controller`), `st.js`, `types.js`,
+  `ecat/model.js` and friends. Keep edits minimal so it can be re-synced.
+  `devices.js` is a trimmed EtherCAT-only shim. `masters.js` lists the
+  runtimes Simulate offers, which are **EtherCAT masters only** (TwinCAT,
+  CODESYS EtherCAT Master SL, Omron Sysmac) by the user's decision.
+- `src/sim/` — Simulate: `station.js` (E-bus segments, master choice,
+  slave walk, process image), `electrical.js` (`buildCircuit` /
+  `solveCircuit` / `readCircuit`, a union-find net solver at 24 V/0 V/L/N),
+  `plc.js` (ST with VAR/AT parsing, starter program), `useSim.js` (tick
+  loop: solve → inputs → scan → outputs → re-solve → view), `SimPanel.jsx`.
+  Faces in App.jsx take a `sim` prop; with it absent they draw as before.
 - `src/App.jsx` — everything else:
   - `pointGeom(d)` (rail clamp points) **must stay in lockstep with the
     face renderers**; `freeGeom(d)` does the same for free components.

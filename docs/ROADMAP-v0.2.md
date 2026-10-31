@@ -127,6 +127,19 @@ captured on the scope with a one-cycle delay.
 **Run** mode in the header turns the design into a live station driven by
 PLCSIM's engine.
 
+**Controller scope (decided): EtherCAT masters only.** That means Beckhoff
+TwinCAT (CX / C6 / user mode), CODESYS EtherCAT Master SL, and Omron
+Sysmac (NX/NJ/NY). PLCSIM's Rockwell, Siemens and other non-EtherCAT
+profiles are not carried over.
+
+**Status (on `v0.2-dev`):** first slice built. It includes ▶ Simulate, the
+engine vendored into `src/plcsim/` (copy of PLCSIM @ 4e9dba6, chosen until
+the submodule/merge decision below), the ST editor with VAR/AT, the INIT→OP
+state machine, forcing, the electrical solver (pulled forward from M1), and
+live LEDs on every face. Still to do from this section: the LD/FBD/SFC
+editors, right-click forcing on the canvas, inspector tag values, and the
+schema v2 bump.
+
 - **Data path, with no file round-trip:** `fromConfigCat(doc)` →
   `buildProcessImage` → `networkToDevice` → `new Controller(project)`. In
   process, PLCSIM reads ConfigCAT's catalog directly, so its bundled 162 KB

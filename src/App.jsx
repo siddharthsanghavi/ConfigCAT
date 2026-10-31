@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { useSim, actuatorKind } from "./sim/useSim.js";
+import SimPanel from "./sim/SimPanel.jsx";
 import { jsPDF } from "jspdf";
 import { CATALOG, GROUPS } from "./catalog";
 import { ETG_BRANDS } from "./catalog-etg.js";
@@ -155,6 +157,8 @@ const WIRES = [
   { id: "dvi",  name: "DVI-D cable",                    stroke: "#8A8F98", w: 3.8, net: "dvi",  conn: "plug" },
 ];
 const wireById = Object.fromEntries(WIRES.map((w) => [w.id, w]));
+// simulation: halo on a wire by the level its net sits at
+const SIM_GLOW = { p24: "#FF6B5E", L: "#FFA24A", short: "#E040FB" };
 const byId = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
 
 let SEQ = 1;
@@ -292,7 +296,11 @@ function sanitizeDoc(raw) {
   const wires = (Array.isArray(raw.wires) ? raw.wires : []).filter(
     (w) => w && w.id && w.a && w.b && wireById[w.type] && uids.has(w.a.uid) && uids.has(w.b.uid)
   );
-  return { name: cleanName(raw.name) || DEF_NAME, rails, wires, free };
+  const plc = raw.plc && typeof raw.plc === "object" ? {
+    code: typeof raw.plc.code === "string" ? raw.plc.code.slice(0, 200000) : undefined,
+    runtime: typeof raw.plc.runtime === "string" ? raw.plc.runtime : undefined,
+  } : undefined;
+  return { name: cleanName(raw.name) || DEF_NAME, rails, wires, free, ...(plc ? { plc } : {}) };
 }
 const demoDoc = () => ({
   name: "Demo station",
@@ -811,6 +819,7 @@ export default function BeckhoffConfigurator() {
   const removeRail = (ri) => {
     const uids = new Set(rails[ri].items.map((i) => i.uid));
     update((d) => ({
+      ...d,
       rails: d.rails.filter((_, i) => i !== ri),
       wires: d.wires.filter((x) => !uids.has(x.a.uid) && !uids.has(x.b.uid)),
     }));
@@ -1184,6 +1193,23 @@ export default function BeckhoffConfigurator() {
     return s;
   }, [wires]);
 
+  // ---- simulation (PLCSIM engine over the drawn station) ----
+  const [simOn, setSimOn] = useState(false);
+  const setPlc = (patch) => setDoc((d) => ({ ...d, plc: { ...(d.plc || {}), ...patch } })); // not undoable
+  const sim = useSim({ enabled: simOn, doc, byId, pos: layout.pos, wireById, runtimeId: doc.plc?.runtime, code: doc.plc?.code });
+  const sv = simOn ? sim.view : null;
+  useEffect(() => {
+    if (!simOn) return undefined;
+    const up = () => sim.releaseAll();
+    window.addEventListener("pointerup", up);
+    return () => window.removeEventListener("pointerup", up);
+  });
+  const toggleSim = () => {
+    setSimOn((v) => !v);
+    setWireMode(false); setPending(null); setWireCursor(null);
+  };
+  const actuate = (uid, down) => sim.actuate(uid, layout.pos[uid]?.d, down);
+
   // rail items that actually receive power/E-bus: a terminal is powered only
   // if it sits in a segment fed by a coupler/embedded PC and before the end
   // cover. Stranded terminals (no coupler in the segment, or past a cover)
@@ -1438,7 +1464,11 @@ export default function BeckhoffConfigurator() {
         <div style={S.headerActions}>
           <button style={{ ...S.btnGhost, opacity: past.length ? 1 : 0.4 }} disabled={!past.length} onClick={undo} title="Undo (Ctrl+Z)">↶</button>
           <button style={{ ...S.btnGhost, opacity: future.length ? 1 : 0.4 }} disabled={!future.length} onClick={redo} title="Redo (Ctrl+Y)">↷</button>
-          <button style={{ ...S.btnGhost, ...(wireMode ? S.btnOn : null) }}
+          <button style={{ ...S.btnGhost, ...(simOn ? S.btnSim : null) }} onClick={toggleSim}
+            title="Run the station: a simulated EtherCAT master executes a PLC program, and inputs, outputs and device lights follow the wiring">
+            {simOn ? "■ Stop simulation" : "▶ Simulate"}
+          </button>
+          <button style={{ ...S.btnGhost, ...(wireMode ? S.btnOn : null), ...(simOn ? { opacity: 0.4 } : null) }} disabled={simOn}
             onClick={() => { setWireMode((v) => !v); setPending(null); setWireCursor(null); }}>
             {wireMode ? "✕ Exit wire tool" : "⚡ Wire tool"}
           </button>
@@ -1596,7 +1626,8 @@ export default function BeckhoffConfigurator() {
           })()}
         </aside>
 
-        <main style={S.stage} className="scroll">
+        <div style={{ display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0 }}>
+        <main style={{ ...S.stage, flex: 1, minHeight: 0 }} className="scroll">
           <svg ref={svgRef} xmlns="http://www.w3.org/2000/svg" width={layout.canvasW} height={layout.canvasH} style={{ display: "block" }}
             onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}
             onPointerMove={onCanvasPointerMove} onPointerUp={endCanvasDrag} onPointerLeave={endCanvasDrag}>
@@ -1647,10 +1678,11 @@ export default function BeckhoffConfigurator() {
                   {rail.items.map((inst) => (
                     <TerminalG key={inst.uid} inst={inst} layout={layout} selected={selected === inst.uid}
                       wireMode={wireMode} pending={pending} wiredPts={wiredPts} powered={poweredUids.has(inst.uid)}
+                      sim={sv ? sv.term[inst.uid] || {} : null}
                       dragging={dragVis?.uid === inst.uid}
                       onSelect={() => { setSelected(inst.uid); setSelWire(null); }}
                       onDetail={() => setDetail(inst.uid)}
-                      onDragStart={(e) => startDragTerm(inst.uid, e)}
+                      onDragStart={simOn ? null : (e) => startDragTerm(inst.uid, e)}
                       onPointDown={pointDown} onPointUp={pointUp}
                       onHover={(u, i) => setHover({ uid: u, pt: i })}
                       onLeave={() => setHover(null)} />
@@ -1690,6 +1722,9 @@ export default function BeckhoffConfigurator() {
                   <path d={path} fill="none" stroke="transparent" strokeWidth="12" />
                   {isSel && <path d={path} fill="none" stroke="#1C2126" strokeWidth={t.w + 4} opacity="0.25" />}
                   {t.ec && <path d={path} fill="none" stroke="#7FE2A9" strokeWidth={t.w + 4} opacity="0.45" strokeLinecap="round" />}
+                  {sv && SIM_GLOW[sv.wires[w.id]] && (
+                    <path d={path} fill="none" stroke={SIM_GLOW[sv.wires[w.id]]} strokeWidth={t.w + 5} opacity="0.42" strokeLinecap="round" pointerEvents="none" />
+                  )}
                   {iolink && <path d={path} fill="none" stroke="#4AA3FF" strokeWidth={t.w + 4} opacity="0.4" strokeLinecap="round" />}
                   {t.shield && <path d={path} fill="none" stroke="#5F656C" strokeWidth={t.w + 2} />}
                   <path d={path} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" strokeLinejoin="round" />
@@ -1724,8 +1759,10 @@ export default function BeckhoffConfigurator() {
               return (
                 <FreeCompG key={f.uid} inst={f} layout={lay} selected={selected === f.uid}
                   wireMode={wireMode} pending={pending} wired={wiredComps.has(f.uid)}
+                  sim={sv ? sv.dev[f.uid] || {} : null}
+                  actuator={simOn && !!actuatorKind(layout.pos[f.uid]?.d)}
                   onSelect={() => { setSelected(f.uid); setSelWire(null); }}
-                  onDragStart={(e) => startDragFree(f.uid, e)}
+                  onDragStart={simOn ? (e) => { if (actuate(f.uid, true)) e.stopPropagation(); } : (e) => startDragFree(f.uid, e)}
                   onPointDown={pointDown} onPointUp={pointUp}
                   onHover={(u, i) => setHover({ uid: u, pt: i })}
                   onLeave={() => setHover(null)} />
@@ -1784,6 +1821,12 @@ export default function BeckhoffConfigurator() {
             })()}
           </svg>
         </main>
+        {simOn && (
+          <SimPanel sim={sim} code={sim.code} setCode={(code) => setPlc({ code })}
+            runtimeId={doc.plc?.runtime} setRuntime={(runtime) => setPlc({ runtime: runtime || undefined })}
+            onReset={() => setPlc({ code: undefined })} />
+        )}
+        </div>
 
         <aside style={S.side} className="scroll">
           <section style={S.card}>
@@ -2137,6 +2180,9 @@ function Tab({ x, y, w = 15, h = 9.5, color, text }) {
 }
 
 // recessed LED window with rectangular LEDs
+// a state is true / false, "blink" (2.5 Hz), "flash" (single flash, EtherCAT
+// SAFEOP) or "red" (error). Blinking uses SMIL so the screenshot tool can
+// freeze it on a fixed frame.
 function LedWindow({ x, y, w, h, states }) {
   const rows = Math.ceil(states.length / 2);
   const px = [x + w * 0.30, x + w * 0.70];
@@ -2150,8 +2196,16 @@ function LedWindow({ x, y, w, h, states }) {
         const lx = px[col], ly = y + 6 + pitch * row + pitch / 2 - 2;
         return (
           <g key={i}>
-            <rect x={lx - 3.4} y={ly - 1.8} width="6.8" height="3.6" rx="0.8" fill={on ? M.ledOn : M.ledOff} />
-            {on && <rect x={lx - 3.4} y={ly - 1.8} width="6.8" height="3.6" rx="0.8" fill={M.ledOn} opacity="0.5" filter="blur(2px)" />}
+            <rect x={lx - 3.4} y={ly - 1.8} width="6.8" height="3.6" rx="0.8" fill={M.ledOff} />
+            {on && (
+              <g>
+                <rect x={lx - 3.4} y={ly - 1.8} width="6.8" height="3.6" rx="0.8" fill={on === "red" ? "#FF3B30" : M.ledOn} />
+                <rect x={lx - 3.4} y={ly - 1.8} width="6.8" height="3.6" rx="0.8" fill={on === "red" ? "#FF3B30" : M.ledOn} opacity="0.5" filter="blur(2px)" />
+                {(on === "blink" || on === "flash") && (
+                  <animate attributeName="opacity" values={on === "blink" ? "1;1;0;0" : "1;0;0;0;0"} dur={on === "blink" ? "0.4s" : "1.2s"} calcMode="discrete" repeatCount="indefinite" />
+                )}
+              </g>
+            )}
           </g>
         );
       })}
@@ -2319,7 +2373,7 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   );
 }
 
-function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
+function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, sim = null, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
   const t = layout.pos[inst.uid];
   if (!t) return null;
   const { d, geom } = t;
@@ -2356,12 +2410,12 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {/* silver rail-latch nub near rail line */}
       <rect x="-1.2" y={190} width="3" height="12" rx="1.2" fill="#C9CDD2" stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />
 
-      {d.coupler ? <CouplerFace d={d} W={W} uid={uid} /> :
-        d.psu ? <PsuFace d={d} W={W} /> :
-        d.cx ? <CxFace d={d} W={W} /> :
+      {d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
+        d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
+        d.cx ? <CxFace d={d} W={W} sim={sim} /> :
         d.endcap || d.blank ? <PlainFace d={d} W={W} /> :
-        d.ext || d.junction || d.rj ? <RjTermFace d={d} W={W} /> :
-        <ElFace d={d} W={W} uid={uid} geom={geom} wiredPts={wiredPts} powered={powered} />}
+        d.ext || d.junction || d.rj ? <RjTermFace d={d} W={W} sim={sim} /> :
+        <ElFace d={d} W={W} uid={uid} geom={geom} wiredPts={wiredPts} powered={powered} sim={sim} />}
 
       {/* interactive clamp points + network ports */}
       {geom.pts.map((p, i) => {
@@ -2408,14 +2462,31 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
 }
 
 /* --- standard EL terminal face -------------------------------------- */
-function ElFace({ d, W, uid, geom, wiredPts, powered = true }) {
+// LED slot → channel (0-based): four-channel terminals pair LEDs across
+// (1 2 / 3 4); on eight- and sixteen-channel ones each LED sits over a clamp
+// column, so it shows the channel wired to that column's clamp — which the
+// verified pinout gives (EL1008: 1 3 5 7 left, 2 4 6 8 right).
+const ledChannel = (slot, d) => {
+  if (d.ch <= 4) return slot;
+  const idx = (slot % 2) * (d.ch / 2) + Math.floor(slot / 2);
+  const p = d.pinout?.[idx];
+  return p?.ch ? p.ch - 1 : idx;
+};
+
+function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   const b = geom.block || {};
   const cols = b.cols || [W * 0.30, W * 0.70];
   const isFeedLike = !!d.feed;
   // LEDs light only when the terminal actually receives power/E-bus; a dead
   // (stranded) terminal keeps its LED dots but shows them all off.
+  // While simulating, a channel LED shows that channel's real state.
   const ledStates = [];
-  if (d.io) for (let c = 0; c < d.ch; c++) ledStates.push(powered && wiredPts.has(`${uid}:${c}`));
+  if (sim) {
+    if (d.io && sim.ch) for (let s = 0; s < d.ch; s++) ledStates.push(!!sim.ch[ledChannel(s, d)]);
+    else if (d.feed) ledStates.push(!!sim.up, !!sim.up);
+    else if (d.fn === "mot" || d.fn === "pos") ledStates.push(sim.run || false, false, false, false);
+    else if (d.fn === "saf" && !d.io) ledStates.push(sim.run || false, false);
+  } else if (d.io) for (let c = 0; c < d.ch; c++) ledStates.push(powered && wiredPts.has(`${uid}:${c}`));
   else if (d.feed) ledStates.push(powered, powered); // Us / Up
   else if (d.fn === "mot" || d.fn === "pos") ledStates.push(powered, false, false, false);
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
@@ -2460,7 +2531,7 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true }) {
 }
 
 /* --- EK1100 / EK1101 / EK1501 coupler ------------------------------- */
-function CouplerFace({ d, W, uid }) {
+function CouplerFace({ d, W, uid, sim = null }) {
   const bx = W - 76;                       // terminal block left edge
   const cols = [bx + 22, bx + 54];
   const housingCx = bx * 0.42;
@@ -2488,7 +2559,10 @@ function CouplerFace({ d, W, uid }) {
       {/* terminal block section (right) */}
       <rect x={bx} y="2" width={W - bx - 1} height={TH - 4} fill="url(#tbody)" opacity="0.6" />
       <OrangeLabels cx1={cols[0]} cx2={cols[1]} />
-      <LedWindow x={bx + 6} y={18} w={64} h={40} states={[true, true, true, false, true, false, false, false]} />
+      {/* RUN · link X1 · link X2 · ERR · Us · Up */}
+      <LedWindow x={bx + 6} y={18} w={64} h={40} states={sim
+        ? [sim.run || false, !!sim.alive, !!sim.alive, false, !!sim.us, !!sim.up, false, false]
+        : [true, true, true, false, true, false, false, false]} />
       {FEED_GROUPS.map((g, gi) => {
         const gTop = 64 + gi * ((TH - 24 - 64) / 4);
         return (
@@ -2516,7 +2590,7 @@ function M8({ cx, cy }) {
 }
 
 /* --- PS-series power supply ------------------------------------------ */
-function PsuFace({ d, W }) {
+function PsuFace({ d, W, sim = null }) {
   const oc = [W * 0.32, W * 0.68];
   return (
     <g>
@@ -2525,7 +2599,9 @@ function PsuFace({ d, W }) {
       <text x="10" y="44" fill={M.txtDim} fontSize="4.8" fontFamily="system-ui">{d.out}</text>
       {/* DC OK LED */}
       <rect x={W - 34} y="18" width="24" height="12" rx="2" fill={M.winFrame} stroke={M.winEdge} strokeWidth="0.6" />
-      <rect x={W - 31} y="21" width="7" height="4" rx="1" fill={M.ledOn} />
+      <rect x={W - 31} y="21" width="7" height="4" rx="1" fill={!sim || sim.ok ? M.ledOn : sim.overload ? "#FF3B30" : M.ledOff}>
+        {sim?.overload && <animate attributeName="opacity" values="1;0" dur="0.5s" calcMode="discrete" repeatCount="indefinite" />}
+      </rect>
       <text x={W - 22} y="26" fill={M.txt} fontSize="4.2" fontFamily="system-ui">DC OK</text>
       {/* AC input tabs */}
       <text x="10" y="60" fill={M.txtDim} fontSize="4.6" fontFamily="system-ui">AC INPUT 100-240 V</text>
@@ -2547,12 +2623,14 @@ function PsuFace({ d, W }) {
 }
 
 /* --- CX7000 embedded PC --------------------------------------------- */
-function CxFace({ d, W }) {
+function CxFace({ d, W, sim = null }) {
   return (
     <g>
       <text x="12" y="22" fill={C.brand} fontSize="9" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.5px" }}>BECKHOFF</text>
       <text x="12" y="34" fill={M.txt} fontSize="8" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
-      <LedWindow x={12} y={44} w={40} h={34} states={[true, true, false, false]} />
+      <LedWindow x={12} y={44} w={40} h={34} states={sim
+        ? [!!sim.us, sim.plc === "RUN" ? true : sim.plc === "FAULT" ? false : "blink", sim.plc === "FAULT" ? "red" : false, false]
+        : [true, true, false, false]} />
       <text x={14} y={88} fill={M.txtDim} fontSize="4.6" fontFamily="system-ui">PWR · TC · ERR</text>
       <Rj45 cx={32} y={100} tag="X001 ETH" />
       <rect x="14" y="150" width="36" height="12" rx="2" fill={M.rjPort} />
@@ -2564,13 +2642,13 @@ function CxFace({ d, W }) {
 }
 
 /* --- comm terminals with RJ45, extensions, junctions ----------------- */
-function RjTermFace({ d, W }) {
+function RjTermFace({ d, W, sim = null }) {
   const n = portCount(d);
   const pitch = n > 2 ? 50 : 66;
   return (
     <g>
       <OrangeLabels cx1={W * 0.32} cx2={W * 0.68} />
-      <LedWindow x={W * 0.13} y={18} w={W * 0.74} h={36} states={[true, false, true, false]} />
+      <LedWindow x={W * 0.13} y={18} w={W * 0.74} h={36} states={sim ? [sim.run || false, false, !!sim.alive, false] : [true, false, true, false]} />
       <text x={W / 2} y={64} fill={M.txt} fontSize="5.6" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
       {d.fiber ? (
         <g>
@@ -3326,7 +3404,7 @@ function PortGlyph({ x, y, kind, label }) {
   );
 }
 
-function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
+function FreeCompG({ inst, layout, selected, wireMode, pending, wired, sim = null, actuator = false, onSelect, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
   const t = layout.pos[inst.uid];
   if (!t) return null;
   const { d, geom } = t;
@@ -3341,7 +3419,11 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
     const m = (v) => Math.round(v + (255 - v) * 0.42);
     return `rgb(${m(r)},${m(g)},${m(b)})`;
   })();
-  const animate = d.motion && wired; // motion parts move once powered + wired
+  // motion parts move once powered + wired; while simulating, only when their
+  // drive is powered, on the bus and in OP
+  const animate = sim ? !!sim.run : d.motion && wired;
+  const lit = sim?.lit || {};
+  const glow = (c) => ({ filter: `drop-shadow(0 0 3px ${c}) drop-shadow(0 0 7px ${c})` });
   const face = (() => {
     switch (d.kind) {
       case "ipc": return (
@@ -3352,12 +3434,13 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           {Array.from({ length: 4 }).map((_, i) => (
             <rect key={i} x="10" y={36 + i * 7} width={W * 0.4} height="2.4" rx="1.2" fill="rgba(0,0,0,0.14)" />
           ))}
+          {sim && <rect x={W - 22} y="34" width="9" height="4" rx="1" fill={sim.powered ? M.ledOn : M.ledOff} style={sim.powered ? glow(M.ledOn) : null} />}
         </g>
       );
       case "panel": return (
         <g>
           <rect x="0" y="0" width={W} height={H - 30} rx="5" fill="#2B2F33" stroke="#54585C" strokeWidth="1" />
-          <rect x="7" y="7" width={W - 14} height={H - 52} rx="2" fill="#12405E" />
+          <rect x="7" y="7" width={W - 14} height={H - 52} rx="2" fill={sim && !sim.powered ? "#15191D" : "#12405E"} />
           <text x={W / 2} y={(H - 30) / 2} fill="#7FB6D9" fontSize="7" textAnchor="middle" fontFamily="system-ui">{d.name}</text>
           <text x={W - 10} y={H - 36} fill="#C9CDD2" fontSize="5" textAnchor="end" fontFamily="system-ui">{brand.name} {d.id}</text>
           <rect x="0" y={H - 30} width={W} height="30" rx="3" fill="url(#psbody)" stroke={M.hEdge} strokeWidth="0.7" />
@@ -3372,7 +3455,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           <text x="8" y="14" fill={brandOnDark} fontSize="6.5" fontWeight="800" fontFamily="system-ui">{brand.name}</text>
           <text x="8" y={H - 34} fill="#C9CDD2" fontSize="6.5" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
           <rect x={W * 0.2} y={72} width={W * 0.6} height="12" rx="2" fill={M.winFrame} />
-          <rect x={W * 0.2 + 3} y={75} width="6" height="6" rx="1" fill={M.ledOn}>
+          <rect x={W * 0.2 + 3} y={75} width="6" height="6" rx="1" fill={sim && !sim.powered ? M.ledOff : sim && !sim.alive ? "#FF3B30" : M.ledOn}>
             {animate && <animate attributeName="opacity" values="1;0.2;1" dur="0.5s" repeatCount="indefinite" />}
           </rect>
           {/* motion indicator — spinning rotor arc when powered + wired */}
@@ -3423,6 +3506,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           <rect x="8" y={H - 52} width={W - 16} height="22" rx="3" fill="#B7BCC2" stroke="#7A8086" strokeWidth="1" />
           <rect x={W / 2 - 16} y="6" width="32" height={H - 60} rx="3" fill="#3A3F45" stroke="#1E2126" strokeWidth="1" />
           <text x={W / 2} y={H / 2 - 18} fill="#C9CDD2" fontSize="5.2" textAnchor="middle" fontFamily="system-ui">24VDC</text>
+          {sim && <circle cx={W / 2} cy="16" r="3.2" fill={lit.coil ? "#FFD60A" : "#4A4F55"} style={lit.coil ? glow("#FFD60A") : null} />}
         </g>
       );
       case "stack": {
@@ -3437,26 +3521,46 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
             <rect x={W / 2 - 6} y={boxTop - 12} width="12" height="12" fill="#54585C" />
             {items.map((lb, i) => (
               <rect key={i} x={W / 2 - 13} y={boxTop - 32 - i * 20} width="26" height="19" rx="2"
-                fill={colors[lb] || "#888"} stroke="rgba(0,0,0,0.3)" strokeWidth="0.7" opacity="0.9" />
+                fill={colors[lb] || "#888"} stroke="rgba(0,0,0,0.3)" strokeWidth="0.7"
+                opacity={!sim ? 0.9 : lit[lb] ? 1 : 0.26} style={sim && lit[lb] ? glow(colors[lb] || "#fff") : null} />
             ))}
             {d.buzzer && <rect x={W / 2 - 13} y={boxTop - 32 - items.length * 20 + 8} width="26" height="11" rx="4" fill="#54585C" />}
+            {d.buzzer && sim && lit.BZ && (
+              <path d={`M ${W / 2 + 16} ${boxTop - 30 - items.length * 20 + 8} q 5 5 0 10 M ${W / 2 + 20} ${boxTop - 33 - items.length * 20 + 8} q 8 8 0 16`} fill="none" stroke="#54585C" strokeWidth="1.2">
+                <animate attributeName="opacity" values="1;0.2;1" dur="0.4s" repeatCount="indefinite" />
+              </path>
+            )}
             <rect x={W / 2 - 9} y={boxTop - 38 - (items.length + (d.buzzer ? 1 : 0)) * 20 + (d.buzzer ? 8 : 0)} width="18" height="6" rx="3" fill="#3A3F45" />
           </g>
         );
       }
-      case "btn": case "estop": return (
-        <g>
-          <rect x="0" y="0" width={W} height={W * 0.85} rx="6" fill={d.kind === "estop" ? "#E8C400" : "#DADDE0"} stroke={M.hEdge} strokeWidth="0.9" />
-          <circle cx={W / 2} cy={W * 0.42} r={W * 0.28} fill={d.kind === "estop" ? "#C4262E" : d.illum ? "#E8C400" : "#3A3F45"} stroke="rgba(0,0,0,0.35)" strokeWidth="1" />
-          {d.sel && <rect x={W / 2 - 2} y={W * 0.42 - 12} width="4" height="24" rx="2" fill="#DADDE0" transform={`rotate(35 ${W / 2} ${W * 0.42})`} />}
-          {d.kind === "estop" && <circle cx={W / 2} cy={W * 0.42} r={W * 0.15} fill="#A31C24" />}
-        </g>
-      );
+      case "btn": case "estop": {
+        // pressed: the cap sinks (smaller, darker rim); an illuminated cap lights
+        // only when its lamp terminals see 24 V
+        const pressed = !!sim?.act;
+        const lampOn = !!lit.lamp;
+        const capR = W * (pressed ? 0.245 : 0.28);
+        const cap = d.kind === "estop" ? "#C4262E" : d.illum ? (!sim ? "#E8C400" : lampOn ? "#FFE14D" : "#8C7A2A") : "#3A3F45";
+        return (
+          <g>
+            <rect x="0" y="0" width={W} height={W * 0.85} rx="6" fill={d.kind === "estop" ? "#E8C400" : "#DADDE0"} stroke={M.hEdge} strokeWidth="0.9" />
+            {sim && <circle cx={W / 2} cy={W * 0.42} r={W * 0.3} fill="rgba(0,0,0,0.22)" />}
+            <circle cx={W / 2} cy={W * 0.42} r={capR} fill={cap} stroke={pressed ? "rgba(0,0,0,0.6)" : "rgba(0,0,0,0.35)"} strokeWidth={pressed ? 1.8 : 1}
+              style={sim && lampOn ? glow("#FFD60A") : null} />
+            {d.sel && <rect x={W / 2 - 2} y={W * 0.42 - 12} width="4" height="24" rx="2" fill="#DADDE0" transform={`rotate(${pressed ? -35 : 35} ${W / 2} ${W * 0.42})`} />}
+            {d.kind === "estop" && <circle cx={W / 2} cy={W * 0.42} r={W * (pressed ? 0.12 : 0.15)} fill="#A31C24" />}
+            {d.kind === "estop" && sim && pressed && (
+              <text x={W / 2} y={W * 0.8} fill="#7A1618" fontSize="5" fontWeight="800" textAnchor="middle" fontFamily="system-ui">PRESSED</text>
+            )}
+          </g>
+        );
+      }
       case "relay": return (
         <g>
           <rect x="4" y="0" width={W - 8} height={H - 22} rx="3" fill="#E9EAEC" stroke={M.hEdge} strokeWidth="0.9" />
           <rect x="10" y="8" width={W - 20} height="14" rx="1.5" fill="#C9CDD2" />
           <text x={W / 2} y={40} fill={M.txt} fontSize="5.4" textAnchor="middle" fontFamily="system-ui">24VDC · 1CO</text>
+          {sim && <rect x={W / 2 - 3.5} y="12" width="7" height="5" rx="1" fill={sim.coil ? "#FFD60A" : M.ledOff} style={sim.coil ? glow("#FFD60A") : null} />}
           {/* socket base the pins sit in */}
           <rect x="0" y={H - 22} width={W} height="22" rx="2.5" fill="#C4C9CE" stroke={M.hEdge} strokeWidth="0.8" />
         </g>
@@ -3468,6 +3572,12 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           <rect x="20" y={H - 22} width={W - 24} height="20" rx="2" fill="#54585C" />
           <rect x="4" y="18" width={W - 8} height={H - 40} rx="3" fill="#3A3F45" stroke="#1E2126" strokeWidth="0.9" />
           <text x={W / 2 + 4} y={H / 2} fill="#C9CDD2" fontSize="5.6" textAnchor="middle" fontFamily="system-ui">3P · 24VDC</text>
+          {sim && (
+            <g>
+              <rect x={W / 2 - 4} y={H / 2 + 6} width="16" height="10" rx="1.5" fill={sim.coil ? "#25A37A" : "#2A2E33"} stroke="#1E2126" strokeWidth="0.6" />
+              <text x={W / 2 + 4} y={H / 2 + 13.6} fill="#fff" fontSize="6" fontWeight="800" textAnchor="middle" fontFamily="system-ui">{sim.coil ? "I" : "O"}</text>
+            </g>
+          )}
         </g>
       );
       case "sensor": case "iol": case "loop2": return (
@@ -3476,7 +3586,11 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           {Array.from({ length: 5 }).map((_, i) => (
             <line key={i} x1={W / 2 - 8} y1={16 + i * 7} x2={W / 2 + 8} y2={16 + i * 7} stroke="#8A9096" strokeWidth="0.7" />
           ))}
-          <circle cx={W / 2} cy="12" r="5" fill={d.kind === "iol" ? "#25A37A" : "#E8781E"} />
+          <circle cx={W / 2} cy="12" r="5" fill={!sim || d.kind !== "sensor" ? (d.kind === "iol" ? "#25A37A" : "#E8781E") : sim.out ? "#FFD60A" : sim.powered ? "#25A37A" : "#5A5F64"}
+            style={sim && sim.out ? glow("#FFD60A") : null} />
+          {sim && d.kind === "sensor" && sim.act && (
+            <path d={`M ${W / 2 + 9} 4 l 6 -2 M ${W / 2 + 9} 12 h 7 M ${W / 2 + 9} 20 l 6 2`} stroke="#E8781E" strokeWidth="1.4" strokeLinecap="round" />
+          )}
           {/* cable stub down to the wiring terminals */}
           <line x1={W / 2} y1={H - 36} x2={W / 2} y2={H - 20} stroke="#3A3F45" strokeWidth="2.4" />
         </g>
@@ -3484,8 +3598,8 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
       case "limit": return (
         <g>
           <rect x="6" y="24" width={W - 12} height={H - 44} rx="3" fill="#E9EAEC" stroke={M.hEdge} strokeWidth="0.9" />
-          <line x1={W / 2} y1="24" x2={W - 8} y2="6" stroke="#54585C" strokeWidth="3" strokeLinecap="round" />
-          <circle cx={W - 8} cy="6" r="5" fill="#B7BCC2" stroke="#54585C" strokeWidth="1" />
+          <line x1={W / 2} y1="24" x2={sim?.act ? W - 4 : W - 8} y2={sim?.act ? 16 : 6} stroke="#54585C" strokeWidth="3" strokeLinecap="round" />
+          <circle cx={sim?.act ? W - 4 : W - 8} cy={sim?.act ? 16 : 6} r="5" fill="#B7BCC2" stroke="#54585C" strokeWidth="1" />
         </g>
       );
       case "curtain": return (
@@ -3493,7 +3607,8 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           <rect x={W / 2 - 13} y="0" width="26" height={H - 40} rx="3" fill="#E8C400" stroke="#A38A00" strokeWidth="1" />
           <rect x={W / 2 - 4} y="8" width="8" height={H - 58} rx="2" fill="#7A1618" />
           {Array.from({ length: 8 }).map((_, i) => (
-            <circle key={i} cx={W / 2} cy={16 + i * (H - 76) / 7} r="1.6" fill="#E85055" />
+            <circle key={i} cx={W / 2} cy={16 + i * (H - 76) / 7} r="1.6"
+              fill={!sim ? "#E85055" : !sim.powered ? "#5A1012" : sim.act ? "#FF3B30" : "#3DD16B"} />
           ))}
           {/* M12 pigtail down to the wiring terminals */}
           <line x1={W / 2} y1={H - 40} x2={W / 2} y2={H - 20} stroke="#3A3F45" strokeWidth="2.4" />
@@ -3539,6 +3654,10 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           {geom.pts.filter((p) => !p.port).map((p, i) => (
             <circle key={i} cx={p.x} cy={p.y} r="6.5" fill="#9BA0A6" stroke="#54585C" strokeWidth="1.1" />
           ))}
+          {sim?.ch && geom.pts.filter((p) => !p.port && p.label !== "⏚").map((p, i) => (
+            <rect key={`l${i}`} x={p.x + (p.x < W / 2 ? 9 : -14)} y={p.y - 2} width="5" height="4" rx="1"
+              fill={sim.ch[i + 1] ? "#FFD60A" : "#3A3F45"} style={sim.ch[i + 1] ? glow("#FFD60A") : null} />
+          ))}
           <text x={W / 2} y={H - 3} fill="#C9CDD2" fontSize="5" textAnchor="middle" fontFamily="ui-monospace,monospace">IP67</text>
         </g>
       );
@@ -3546,7 +3665,9 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
         <g>
           <rect x="0" y="0" width={W} height={H} rx="4" fill="url(#psbody)" stroke={M.hEdge} strokeWidth="0.9" />
           <rect x={W - 30} y="26" width="22" height="11" rx="2" fill={M.winFrame} stroke={M.winEdge} strokeWidth="0.6" />
-          <rect x={W - 27} y="29" width="6" height="4" rx="1" fill={M.ledOn} />
+          <rect x={W - 27} y="29" width="6" height="4" rx="1" fill={!sim || sim.ok ? M.ledOn : sim.overload ? "#FF3B30" : M.ledOff}>
+            {sim?.overload && <animate attributeName="opacity" values="1;0" dur="0.5s" calcMode="discrete" repeatCount="indefinite" />}
+          </rect>
           {Array.from({ length: 10 }).map((_, i) => (
             <rect key={i} x={W * 0.16} y={48 + i * 8} width={W * 0.68} height="2.6" rx="1.3" fill="rgba(0,0,0,0.14)" />
           ))}
@@ -3557,7 +3678,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
         <g>
           <rect x="0" y="0" width={W} height={H} rx="4" fill="#E9EAEC" stroke={M.hEdge} strokeWidth="0.9" />
           {Array.from({ length: d.ch || 4 }).map((_, i) => (
-            <rect key={i} x={12 + i * ((W - 24) / (d.ch || 4))} y="26" width="8" height="8" rx="1.5" fill={M.ledOn} />
+            <rect key={i} x={12 + i * ((W - 24) / (d.ch || 4))} y="26" width="8" height="8" rx="1.5" fill={!sim || sim.ok ? M.ledOn : M.ledOff} />
           ))}
           <text x={W / 2} y={H / 2 + 8} fill={M.txt} fontSize="5.4" textAnchor="middle" fontFamily="system-ui">24VDC</text>
         </g>
@@ -3566,14 +3687,14 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
         <g>
           <rect x={W * 0.15} y="0" width={W * 0.7} height={H} rx="2.5" fill="#E9EAEC" stroke={M.hEdge} strokeWidth="0.9" />
           <rect x={W / 2 - 5} y={H / 2 - 12} width="10" height="20" rx="2" fill="#3A3F45" />
-          <rect x={W / 2 - 3} y={H / 2 - 8} width="6" height="7" rx="1" fill="#D0342C" />
+          <rect x={W / 2 - 3} y={sim?.act ? H / 2 + 0 : H / 2 - 8} width="6" height="7" rx="1" fill={sim?.act ? "#25A37A" : "#D0342C"} />
         </g>
       );
       case "disconnect": return (
         <g>
           <rect x="2" y="2" width={W - 4} height={H - 4} rx="4" fill="#E8C400" stroke="#A38A00" strokeWidth="1" />
           <circle cx={W / 2} cy={H / 2} r={Math.min(W, H) * 0.26} fill="#C4262E" stroke="#7A1618" strokeWidth="1.5" />
-          <rect x={W / 2 - 2.5} y={H / 2 - 14} width="5" height="28" rx="2.5" fill="#3A3F45" transform={`rotate(35 ${W / 2} ${H / 2})`} />
+          <rect x={W / 2 - 2.5} y={H / 2 - 14} width="5" height="28" rx="2.5" fill="#3A3F45" transform={`rotate(${sim?.act ? -55 : 35} ${W / 2} ${H / 2})`} />
           <text x={W / 2} y={H - 6} fill="#3A3F45" fontSize="5" fontWeight="700" textAnchor="middle" fontFamily="system-ui">O–I</text>
         </g>
       );
@@ -3583,6 +3704,11 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
           {Array.from({ length: d.ch || 5 }).map((_, i) => (
             <rect key={i} x={8 + i * ((W - 16) / (d.ch || 5))} y="10" width={((W - 16) / (d.ch || 5)) - 4} height={H - 44} rx="2" fill="#3A3F45" stroke="#1E2126" strokeWidth="0.7" />
           ))}
+          {sim && Array.from({ length: d.ch || 5 }).map((_, i) => {
+            const onV = d.netport ? !!sim.ch?.[i + 1] : !!lit[`V${i + 1}`];
+            return <rect key={`v${i}`} x={8 + i * ((W - 16) / (d.ch || 5)) + 2} y="14" width="6" height="4" rx="1"
+              fill={onV ? "#FFD60A" : "#54585C"} style={onV ? glow("#FFD60A") : null} />;
+          })}
           <text x="6" y={H - 26} fill="#C9CDD2" fontSize="5" fontFamily="system-ui">manifold</text>
         </g>
       );
@@ -3666,7 +3792,7 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, onSelect,
     <g transform={`translate(${t.x}, ${t.y})`} data-uid={uid}
       onClick={(e) => { if (!wireMode) { e.stopPropagation(); onSelect(); } }}
       onPointerDown={(e) => { if (!wireMode && onDragStart) onDragStart(e); }}
-      style={{ cursor: wireMode ? "crosshair" : "grab" }}
+      style={{ cursor: wireMode ? "crosshair" : actuator ? "pointer" : sim ? "default" : "grab" }}
       filter={selected ? "drop-shadow(0 8px 12px rgba(0,0,0,0.28))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.14))"}>
       {selected && <rect x="-6" y="-6" width={W + 12} height={H + 12} rx="7" fill="none" stroke={C.ink} strokeWidth="1.4" strokeDasharray="5 4" />}
       {face}
@@ -3744,6 +3870,7 @@ const S = {
   headerActions: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end", rowGap: 8 },
   btnGhost: { border: `1px solid ${C.line}`, background: C.panel, color: C.ink, padding: "7px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontWeight: 500 },
   btnOn: { background: C.ink, color: "#fff", border: `1px solid ${C.ink}` },
+  btnSim: { background: "#1F7A4D", color: "#fff", border: "1px solid #1F7A4D", fontWeight: 700 },
   projName: { border: `1px solid ${C.line}`, background: C.panel, color: C.ink, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, width: 168, outline: "none" },
   toast: { position: "fixed", top: 68, left: "50%", transform: "translateX(-50%)", background: C.ink, padding: "9px 16px", borderRadius: 9, fontSize: 12.5, fontWeight: 600, zIndex: 80, boxShadow: "0 10px 28px rgba(0,0,0,0.28)", maxWidth: "70vw" },
   wireBar: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", padding: "8px 20px", background: "#FAFBFC", borderBottom: `1px solid ${C.line}` },
