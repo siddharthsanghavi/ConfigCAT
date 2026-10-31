@@ -238,6 +238,104 @@ CodePLC-style practice built on M1–M4.
 
 ---
 
+### M6 · Enclosures, panel layout and glands — v0.2 scope
+Build the cabinet the station lives in. Devices go **inside** a Rittal or
+SCE enclosure, on the mounting plate or on the door, and every cable that
+leaves the enclosure goes through a gland.
+
+**How CodePLC does it** (from their public screenshots): each machine has a
+**Machine** view and a **Panel CP-x** view. The panel is a real enclosure:
+a backplate with DIN rails, wire duct and terminal blocks; a door with the
+operators (START, STOP, E-STOP, RUN/FAULT lamps, RESET) and the
+disconnect handle; and cables leaving the bottom to the field devices. The
+door's operators also appear as a strip under the machine view. A panel
+has states the learner works through: *Energised*, *DS1 off*, *locked and
+tagged*, *door open*, *close-up*. In ConfigCAT you build the panel
+yourself instead of only troubleshooting someone else's.
+
+**The scale problem this has to solve first.** Today's canvas is
+schematic, not physical. Rail terminals are drawn at 4.4 px/mm, but free
+devices are stylised: an AX5103 is 92 px wide (real 92 mm), while an
+EP2338 is 84 px wide (real 30 mm). An enclosure can't be drawn to scale
+around that. So:
+
+- **A separate Panel view per enclosure** (recommended), drawn to scale in
+  mm. The current canvas stays the wiring view, like CodePLC's Machine /
+  Panel tabs and EPLAN's schematic vs Pro Panel. Every device gets a
+  location: `field`, or `{ encl, face: "plate" | "door" }`. Rails belong to
+  an enclosure, and their length is cut to fit.
+- Alternative: draw enclosure frames around devices on the existing
+  canvas. It's quicker, but nothing would be to scale, so fit, depth and
+  gland checks would be guesses.
+
+**Catalog (new `fn: "encl"` family, real dimensions):**
+- **Rittal AX** compact (steel, IP66, NEMA 4, gland plate included). For
+  example 1060.000 is 600×600×210, 1054.000 is 600×600×250, 1058.000 is
+  600×800×250 and 1360.000 is 600×600×350 mm (verify each against
+  Rittal's catalogue as it is added). Also **KX** small terminal boxes and
+  **VX25** floor-standing bays, with mounting plates.
+- **SCE (Saginaw Control & Engineering)**, NEMA 1 / 4 / 12 / 4X
+  wall-mount in inches (e.g. SCE-24N2008LP is 24×20×8 in, NEMA 1), with
+  matching back panels (SCE-24P20 is steel, 21×17 in usable). Show both
+  mm and inches.
+- **Wire duct** (40×60 / 60×80 slotted), **DIN rail** (TS35, cut to
+  length) and **end stops**.
+- **Cable glands:** Lapp SKINTOP MS-M (brass) and ST-M (plastic), M12 to
+  M40. Each has its clamping range, for example the MS-M M20×1.5
+  (53112020) clamps 7–13 mm. **Split cable entries** (icotek / Murrplastik
+  style) are for pre-terminated M12 and RJ45 cables whose connectors don't
+  fit a gland. **Bulkhead connectors** (M12 / RJ45 feed-throughs) cover the
+  rest.
+- **Door items:** 22 mm operators, which already exist as field devices
+  and become placeable on a door; HMI panels with their cutout size; the
+  disconnect handle; fan and filter units.
+- **Real mm sizes (W×H×D) on every part.** Beckhoff terminals already
+  have W, and H×D are known (100×68). Other parts get per-kind defaults,
+  flagged as approximate like the ETG parts.
+
+**Panel view:**
+- *Plate*: devices are dragged onto the plate, snapping to rails and duct.
+  "Auto-layout" makes a first pass: one row per rail, duct above and
+  below, PSUs and drives beside them.
+- *Door*: operators and HMIs placed on the door. Their depth behind the
+  door must clear what is on the plate.
+- *Gland plate* (bottom or top): ConfigCAT fills it automatically. Every
+  wire whose two ends are in different places (inside and field, or two
+  enclosures) is a cable crossing. Each one gets a gland sized from the
+  cable's outer diameter (a new `od` field on each cable type). A
+  pre-terminated cable gets a split entry instead. You can override any
+  pick.
+
+**Checks** (in the Validation panel):
+- Fit: nothing overlaps, everything is inside the usable plate area.
+- Depth: plate device depth + rail stand-off + door device depth ≤
+  enclosure depth.
+- Gland plate: enough room, wrench clearance between glands, every
+  crossing has an entry.
+- IP rating: the enclosure is only as tight as its weakest gland or entry.
+- Heat: power loss inside vs the enclosure's surface area, as a ΔT
+  estimate. When it runs hot, suggest a fan and filter.
+- Weight and duct fill.
+
+**Exports:**
+- Panel layout PDF: front view with dimensions, a door drilling drawing
+  and a gland-plate drilling drawing.
+- The BOM gains the enclosure, mounting plate, rails, duct, glands and
+  end stops.
+
+**Simulate (CodePLC-style panel operation), ties into M1/M2/M3:**
+- The disconnect on the door kills everything downstream.
+- Lock-out / tag-out: the disconnect is off and padlocked, so the panel
+  reads as *Off, locked and tagged*.
+- Door interlock: the door can't open while the disconnect is on.
+- The panel name (CP-1…) and its door strip of operators show on the
+  wiring view, like CodePLC's machine view.
+
+*Done when* the hero cell can be put into a Rittal AX 600×600 with its two
+rails, PSU and drive on the plate, the E-stop and a stack light on the door,
+and auto-filled glands for the sensor, motor and EP-box cables. It should
+pass the fit and depth checks and export a panel PDF.
+
 ## Also worth doing in v0.2 (small, from the existing roadmap)
 - #23 **Cable schedule** CSV (from–to list): the net graph makes it nearly
   free.
@@ -258,8 +356,16 @@ conventions).
 3. A sample TwinCAT project (`.tsproj` + ENI export) to build Tier 1/2
    against.
 4. Instrument placement: floating panels (planned) or a bottom dock.
+5. Enclosures: a separate to-scale Panel view (recommended), or frames on
+   the existing canvas.
+6. First enclosure brands: Rittal (AX / KX / VX25) and SCE. Add nVent
+   Hoffman too?
+7. Gland picks: fully automatic with overrides (recommended), or manual
+   only.
 
 ## Suggested order
-M0 → M1 → M2 multimeter → M3 → M2 scope → M4 Tier 1. Doing the multimeter
+M0 → M1 → M2 multimeter → M3 → M2 scope → M4 Tier 1. M6 (enclosures) can
+run alongside from M0 onward: its catalog and Panel view don't depend on
+the simulator, and only its LOTO / door interlock part needs M1. Doing the multimeter
 before the PLC proves the electrical model on static circuits, before the
 scan loop makes everything move.
