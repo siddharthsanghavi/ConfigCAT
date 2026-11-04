@@ -2726,7 +2726,8 @@ function AboutModal({ onClose }) {
           for those parts are representative defaults chosen per product type, not vendor data.
         </p>
         <p style={{ ...P, color: C.muted, margin: 0 }}>
-          Code and original artwork are MIT licensed. The licence covers neither third-party
+          Copyright &copy; 2026 Siddharth Sanghavi. Code and original artwork are released under
+          the MIT License, provided "as is", without warranty of any kind. The licence covers neither third-party
           trademarks and product names nor third-party catalog data.
         </p>
       </div>

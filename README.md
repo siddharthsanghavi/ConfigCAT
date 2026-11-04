@@ -207,14 +207,15 @@ What that means here:
   uncertified.
 - **The source export is not redistributed in this repository.** ETG holds
   only a non-transferable right to publish member listings, so they are
-  not ours to relicense. `scripts/gen-etg.py` documents how to regenerate
+  not ours to relicense. `src/catalog-etg.js` keeps only the identifying
+  fields listed above, and is excluded from the MIT licence. `scripts/gen-etg.py` documents how to regenerate
   `src/catalog-etg.js` from your own export.
 - The ETG data is not covered by this project's MIT licence — see
   [NOTICE](NOTICE).
 
 ## Trademarks & disclaimer
 
-This project is an independent, non-commercial tool and is **not
+This project is an independent hobby project and is **not
 affiliated with, authorized, endorsed by, or sponsored by** Beckhoff, the
 EtherCAT Technology Group, or any other company named in the catalog.
 
