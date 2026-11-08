@@ -94,11 +94,11 @@ const WIRE_RULES = [
 ];
 
 // which wire types are media cables (must match WIRES ids in App.jsx)
-const NET_WIRE = { cat5e: "eth", cat6a: "eth", ecm12: "eth", ecm12rj: "eth", ecp: "eth", fog: "fo", pofd: "fo", oct: "oct", usb: "usb", hdmi: "hdmi", dp: "dp", cpl4: "dp", dvi: "dvi" };
+const NET_WIRE = { cat5e: "eth", cat6a: "eth", ecm12: "eth", ecm12rj: "eth", ecp: "eth", fog: "fo", pofd: "fo", oct: "oct", usb: "usb", hdmi: "hdmi", dp: "dp", cpl4: "dp", dvi: "dvi", fbus: "bus" };
 // port kind → media
-const PORT_KIND = { rj45: "eth", m12net: "eth", fo: "fo", oct: "oct", usb: "usb", hdmi: "hdmi", dp: "dp", dvi: "dvi" };
+const PORT_KIND = { rj45: "eth", m12net: "eth", fo: "fo", oct: "oct", usb: "usb", hdmi: "hdmi", dp: "dp", dvi: "dvi", dsub: "bus", dnet: "bus" };
 const VIDEO = new Set(["hdmi", "dp", "dvi"]);
-const MEDIA_NAME = { eth: "Ethernet/EtherCAT", fo: "fiber-optic", oct: "OCT motor", usb: "USB", hdmi: "HDMI", dp: "DisplayPort", dvi: "DVI" };
+const MEDIA_NAME = { eth: "Ethernet/EtherCAT", fo: "fiber-optic", oct: "OCT motor", usb: "USB", hdmi: "HDMI", dp: "DisplayPort", dvi: "DVI", bus: "fieldbus" };
 
 export function validateWires(wires, resolve) {
   const issues = [];

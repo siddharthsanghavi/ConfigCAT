@@ -87,6 +87,16 @@ npm run shots          # regenerate README screenshots (see below)
   flag with `bx` 0 / null.
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
+  Board 06 (wide / special EL): `c24` parts (EL66xx, EL67xx, EL6002 / 6022,
+  EL6090, ED6001/6002-0009) take `Comm24Face`; the `C24` table lists their
+  LEDs and connectors (`rj45` / `dsub` / `dnet` ports at x 44) and is read by
+  both `pointGeom` and the face. EL6692 / EL6695 add X3 `24V` / `0V` points.
+  `blk: "el2x8"` (EL7041 / EL7047 / EL7342 / EL5101) reuses the `el24` block;
+  `blk: "hd2x16"` (EL5102 / EL7211 / EL7211-0010 / EL7411) and `"ed2x16"`
+  (ED7062) are two 16-point blocks (points 17–32 = the manual's 1′–16′).
+  Pinout entries may carry `t` (hover text) and `tab` ("+", "−" or a label).
+  D-sub / DeviceNet ports wire with the `fbus` cable (net `bus`).
+  `RENAMED` in `sanitizeDoc` maps retired ids (EL7222 → EL7211-0010).
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the
   pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
   terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the

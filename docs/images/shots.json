@@ -14,7 +14,7 @@
       "file": "docs/images/wiring.png",
       "width": 2760,
       "height": 844,
-      "kb": 416,
+      "kb": 414,
       "caption": "Wire tool mid-connection — press two points and the right cable is chosen for you"
     },
     {
@@ -38,7 +38,7 @@
       "file": "docs/images/simulate.png",
       "width": 3360,
       "height": 2520,
-      "kb": 1370,
+      "kb": 1369,
       "caption": "Simulate: a TwinCAT master runs the I/O check program; the sensor lights its input LED, the stack light follows the output"
     },
     {
@@ -46,7 +46,7 @@
       "file": "docs/images/palette.png",
       "width": 488,
       "height": 1440,
-      "kb": 86,
+      "kb": 88,
       "caption": "Palette by company, then category"
     },
     {
@@ -70,8 +70,16 @@
       "file": "docs/images/validation.png",
       "width": 600,
       "height": 1032,
-      "kb": 73,
+      "kb": 72,
       "caption": "Validation catches rail-structure and E-bus budget problems as you build, and says how to fix them"
+    },
+    {
+      "scene": "projects",
+      "file": "docs/images/projects.png",
+      "width": 1312,
+      "height": 694,
+      "kb": 113,
+      "caption": "Named projects saved in the browser, plus JSON save and import"
     },
     {
       "scene": "about",

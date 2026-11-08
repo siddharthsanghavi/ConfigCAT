@@ -37,6 +37,53 @@ const EK1960_PINS = (() => {
   return p;
 })();
 
+// Motion / encoder clamps (Infosys "LEDs and connection", 2026). A plain
+// entry carries the manual's name (t) and, where the product picture prints
+// one, the tab text; p24 / gnd mark clamps tied to the power contacts. The
+// 24 mm parts list the left block first, then the right (the manual's 1′…).
+const T_ = (t, tab) => (tab ? { t, tab } : { t });
+const PC24 = (t) => ({ r: "p24", t, tab: "+" });
+const PC0 = (t) => ({ r: "gnd", t, tab: "−" });
+const NC = { t: "not connected" };
+const STEP_RIGHT = [T_("A1 · motor winding A1", "A1"), T_("B1 · motor winding B1", "B1"), T_("motor supply +48 V", "+"), T_("motor supply +48 V", "+"),
+  T_("A2 · motor winding A2", "A2"), T_("B2 · motor winding B2", "B2"), T_("motor supply 0 V", "−"), T_("motor supply 0 V", "−")];
+const EL7041_PINS = [T_("A · encoder input A", "A"), T_("C · encoder input C (zero)", "C"), PC24("encoder supply +24 V (from the + power contact)"), T_("Input 1 · digital input 24 V", "I1"),
+  T_("B · encoder input B", "B"), T_("Latch · latch input", "L"), PC0("encoder supply 0 V (from the − power contact)"), T_("Input 2 · digital input 24 V", "I2"), ...STEP_RIGHT];
+const EL7342_PINS = [T_("Enc. A, A · encoder A input A"), T_("Enc. B, A · encoder B input A"), PC24("encoder supply +24 V (from the + power contact)"), T_("Input 1 · digital / latch input 24 V", "I1"),
+  T_("Enc. A, B · encoder A input B"), T_("Enc. B, B · encoder B input B"), PC0("encoder supply 0 V (from the − power contact)"), T_("Input 2 · digital / latch input 24 V", "I2"),
+  T_("A1 · motor A winding A1", "A1"), T_("B1 · motor B winding B1", "B1"), T_("motor supply +48 V", "+"), T_("motor supply +48 V", "+"),
+  T_("A2 · motor A winding A2", "A2"), T_("B2 · motor B winding B2", "B2"), T_("motor supply 0 V", "−"), T_("motor supply 0 V", "−")];
+const EL5101_PINS = [T_("A · encoder input A", "A"), T_("B · encoder input B", "B"), T_("C · encoder input C", "C"), T_("Latch 24 V · latch input", "L"),
+  T_("A̅ · encoder input A inverted", "A̅"), T_("B̅ · encoder input B inverted", "B̅"), T_("C̅ · encoder input C inverted", "C̅"), T_("Gate 24 V · gate input", "G"),
+  T_("Ue +5 V · encoder supply"), PC24("+24 V (internally on the + power contact)"), PC0("0 V (internally on the − power contact)"), T_("Input 1 · status input (encoder alarm)"),
+  T_("Uo 0 V · encoder supply"), PC24("+24 V (internally on the + power contact)"), PC0("0 V (internally on the − power contact)"), T_("Shield")];
+const EL5102_ENC = (k) => [T_(`A${k} · encoder input A${k}`), T_(`B${k} · encoder input B${k}`), T_(`C${k} · encoder input C${k}`), T_(`Status input ${k}`),
+  T_(`+Ue${k} · encoder supply (5 V, 12 V or 24 V)`), T_(`−Uo${k} · encoder supply 0 V`), T_(`Latch ${k} · latch input`), NC,
+  T_(`A̅${k} · encoder input A${k} inverted`), T_(`B̅${k} · encoder input B${k} inverted`), T_(`C̅${k} · encoder input C${k} inverted`), NC,
+  T_(`+Ue${k} · encoder supply (5 V, 12 V or 24 V)`), T_(`−Uo${k} · encoder supply 0 V`), T_(`Gate ${k} · gate / latch 2 input`), NC];
+const SERVO_POWER = (oct) => [T_("U · motor phase U"), T_("W · motor phase W"), T_("Brake + · motor brake +"), T_("48 V · DC link supply + (8 … 48 V)"), T_("48 V · DC link supply + (8 … 48 V)")];
+const EL7211_PINS = [T_("Ref + · resolver excitation + (R1)"), T_("Sin + · resolver sine + (S2)"), T_("Cos + · resolver cosine + (S1)"), ...SERVO_POWER(),
+  T_("Ref − · resolver excitation − (R2)"), T_("Sin − · resolver sine − (S4)"), T_("Cos − · resolver cosine − (S3)"), T_("V · motor phase V"), NC,
+  T_("GND · motor brake GND"), T_("0 V · DC link 0 V"), T_("0 V · DC link 0 V")];
+const EL7211_0010_PINS = [T_("OCT + · feedback +"), T_("Input 1 · digital input"), PC24("+24 V · power contact"), ...SERVO_POWER(),
+  T_("OCT − · feedback −"), T_("Input 2 · digital input"), PC0("0 V · power contact"), T_("V · motor phase V"), NC,
+  T_("Brake GND · motor brake 0 V"), T_("0 V · DC link 0 V"), T_("0 V · DC link 0 V")];
+const NC16 = Array.from({ length: 16 }, () => NC);
+const EL7411_PINS = [T_("Encoder supply +"), T_("ENC A+"), T_("ENC B+"), T_("ENC C+"), T_("Hall sensor U"), T_("Hall sensor W"), T_("Hall sensor supply +"), T_("Input 1 · digital input 24 V"),
+  T_("Encoder supply GND"), T_("ENC A−"), T_("ENC B−"), T_("ENC C−"), T_("Hall sensor V"), NC, T_("Hall sensor supply GND"), T_("Input 2 · digital input 24 V"),
+  T_("Fan supply + (ZB8610)"), T_("Fan diagnostics (ZB8610)"), NC, T_("U · motor phase U"), T_("W · motor phase W"), T_("Brake + · motor brake output"), T_("Load voltage 48 V DC (8 … 48 V)"), T_("Load voltage 48 V DC (8 … 48 V)"),
+  T_("Fan supply GND (ZB8610)"), T_("Fan mode (ZB8610)"), NC, T_("V · motor phase V"), T_("HW Enable · enables the output stage"), T_("Brake GND · motor brake 0 V"), T_("Load voltage GND"), T_("Load voltage GND")];
+const EL7201_PINS = [T_("Ref + · resolver excitation +"), T_("Sin + · resolver sine +"), T_("Cos + · resolver cosine +"), ...SERVO_POWER(),
+  T_("Ref − · resolver excitation −"), T_("Sin − · resolver sine −"), T_("Cos − · resolver cosine −"), T_("V · motor phase V"), NC,
+  T_("GND · motor brake GND"), T_("0 V · DC link 0 V"), T_("0 V · DC link 0 V")];
+const ED7062_PINS = [T_("Enc supply +5 V"), T_("Ch 1 Enc A"), T_("Ch 1 Enc B"), T_("Ch 1 Enc C"), T_("Enc supply +5 V"), T_("Ch 2 Enc A"), T_("Ch 2 Enc B"), T_("Ch 2 Enc C"),
+  T_("Enc supply 0 V"), T_("Ch 1 Enc A̅"), T_("Ch 1 Enc B̅"), T_("Ch 1 Enc C̅"), T_("Enc supply 0 V"), T_("Ch 2 Enc A̅"), T_("Ch 2 Enc B̅"), T_("Ch 2 Enc C̅"),
+  T_("Ch 1 Drive A1 · motor winding"), T_("Ch 1 Drive B1 · motor winding"), T_("Ch 2 Drive A1 · motor winding"), T_("Ch 2 Drive B1 · motor winding"), T_("Ch 1 latch 1"), T_("Ch 1 latch 2"), T_("Ch 1 brake · brake output"), T_("Infeed + 8 … 48 V · motor supply"),
+  T_("Ch 1 Drive A2 · motor winding"), T_("Ch 1 Drive B2 · motor winding"), T_("Ch 2 Drive A2 · motor winding"), T_("Ch 2 Drive B2 · motor winding"), T_("Ch 2 latch 1"), T_("Ch 2 latch 2"), T_("Ch 2 brake · brake output"), T_("Infeed 0 V · ground for all points")];
+const ED5112_PINS = [T_("Ch1 A · encoder input A"), T_("Ch1 B · encoder input B"), T_("Ch1 C / Ch2 A"), T_("Ch1 DI / Ch2 B"), T_("Enc supply + (5 V default)"), T_("Enc supply − (0 V)"), T_("Latch"), NC,
+  T_("Ch1 A̅"), T_("Ch1 B̅"), T_("Ch1 C̅ / Ch2 A̅"), T_("Ch2 B̅"), T_("Enc supply + (5 V default)"), T_("Enc supply − (0 V)"), T_("Gate"), NC];
+const ED6224_PINS = [T_("Ch 1 · IO-Link port 1 (C/Q)"), PC24("+24 V"), T_("Ch 2 · IO-Link port 2 (C/Q)"), PC24("+24 V"), T_("Ch 3 · IO-Link port 3 (C/Q)"), PC24("+24 V"), T_("Ch 4 · IO-Link port 4 (C/Q)"), PC24("+24 V"),
+  PC24("+24 V"), PC0("0 V"), PC24("+24 V"), PC0("0 V"), PC24("+24 V"), PC0("0 V"), PC24("+24 V"), PC0("0 V")];
 export const CATALOG = [
   // --- Couplers & Embedded PCs ---
   { id: "EK1100", name: "EtherCAT Coupler",            fn: "cplr", io: null, ch: 0, w: 44, ebus: +2000, coupler: true, desc: "E-bus head station, X1 IN / X2 OUT, 5 V / 2 A E-bus" },
@@ -311,51 +358,63 @@ export const CATALOG = [
   { id: "EL4712", name: "2-Ch AO 0-20mA oversampling", fn: "ao", io: "ao", ch: 2, w: 12, ebus: -200, desc: "XFC oversampling" },
   { id: "EL4732", name: "2-Ch AO ±10V oversampling", fn: "ao", io: "ao", ch: 2, w: 12, ebus: -200, desc: "XFC oversampling" },
   // --- Position / Encoder ---
-  { id: "EL5001", name: "1-Ch SSI Encoder",          fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
-  { id: "EL5101", name: "1-Ch Incremental Encoder RS422", fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
-  { id: "EL5151", name: "1-Ch Incremental Encoder 24V", fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
-  { id: "EL5152", name: "2-Ch Incremental Encoder 24V", fn: "mot", io: null, ch: 2, w: 12, ebus: -110 },
+  { id: "EL5001", name: "1-Ch SSI Encoder",          fn: "mot", io: null, ch: 1, w: 12, ebus: -120 },
+  { id: "EL5101", name: "1-Ch Incremental Encoder RS422", fn: "mot", io: null, ch: 1, w: 24, ebus: -130, blk: "el2x8", pinout: EL5101_PINS, desc: "24 mm, 2 × 8 clamps; pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "EL5151", name: "1-Ch Incremental Encoder 24V", fn: "mot", io: null, ch: 1, w: 12, ebus: -130 },
+  { id: "EL5152", name: "2-Ch Incremental Encoder 24V", fn: "mot", io: null, ch: 2, w: 12, ebus: -130 },
   // — position/encoder additions from Beckhoff catalog 2026 (approximate) —
-  { id: "EL5002", name: "2-Ch SSI Encoder",          fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5021", name: "1-Ch Sin/Cos Encoder 1Vpp", fn: "mot", io: null, ch: 1, w: 12, ebus: -140 },
-  { id: "EL5032", name: "2-Ch EnDat 2.2 Encoder",    fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5042", name: "2-Ch BiSS-C Encoder",       fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5072", name: "2-Ch Resolver",             fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5102", name: "2-Ch Incremental Encoder RS422", fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5112", name: "2-Ch Incremental Encoder",  fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
-  { id: "EL5131", name: "1-Ch Incremental Encoder XFC", fn: "mot", io: null, ch: 1, w: 12, ebus: -140 },
+  { id: "EL5002", name: "2-Ch SSI Encoder",          fn: "mot", io: null, ch: 2, w: 12, ebus: -130 },
+  { id: "EL5021", name: "1-Ch Sin/Cos Encoder 1Vpp", fn: "mot", io: null, ch: 1, w: 12, ebus: -120 },
+  { id: "EL5032", name: "2-Ch EnDat 2.2 Encoder",    fn: "mot", io: null, ch: 2, w: 12, ebus: -120 },
+  { id: "EL5042", name: "2-Ch BiSS-C Encoder",       fn: "mot", io: null, ch: 2, w: 12, ebus: -120 },
+  { id: "EL5072", name: "2-Ch Inductive Displacement", fn: "mot", io: null, ch: 2, w: 12, ebus: -200, desc: "Inductive sensor interface (LVDT / half bridge)" },
+  { id: "EL5102", name: "2-Ch Incremental Encoder RS422", fn: "mot", io: null, ch: 2, w: 24, ebus: -210, blk: "hd2x16", pinout: [...EL5102_ENC(1), ...EL5102_ENC(2)], desc: "24 mm, 2 × 16 clamps (encoder 1 left, encoder 2 right); pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "EL5112", name: "Incremental Encoder 2×AB / 1×ABC", fn: "mot", io: null, ch: 2, w: 12, ebus: -190 },
+  { id: "EL5131", name: "1-Ch Incremental Encoder XFC", fn: "mot", io: null, ch: 1, w: 12, ebus: -240 },
   // --- Communication ---
-  { id: "EL6001", name: "Serial RS232",          fn: "sys", io: null, ch: 1, w: 12, ebus: -110 },
-  { id: "EL6021", name: "Serial RS422/RS485",    fn: "sys", io: null, ch: 1, w: 12, ebus: -110 },
-  { id: "EL6224", name: "IO-Link Master 4-port", fn: "sys", io: null, ch: 4, w: 12, ebus: -140 },
-  { id: "EL6601", name: "Ethernet Switchport",   fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1 },
-  { id: "EL6631", name: "PROFINET Controller",   fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1 },
-  { id: "EL6652", name: "EtherNet/IP Master",    fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1 },
-  { id: "EL6751", name: "CANopen Master",        fn: "sys", io: null, ch: 1, w: 12, ebus: -150 },
+  { id: "EL6001", name: "Serial RS232",          fn: "sys", io: null, ch: 1, w: 12, ebus: -120 },
+  { id: "EL6021", name: "Serial RS422/RS485",    fn: "sys", io: null, ch: 1, w: 12, ebus: -170 },
+  { id: "EL6224", name: "IO-Link Master 4-port", fn: "sys", io: null, ch: 4, w: 12, ebus: -120 },
+  { id: "EL6601", name: "Ethernet Switchport", fn: "sys", io: null, ch: 1, w: 24, ebus: -260, c24: true, desc: "1 × RJ45; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6631", name: "PROFINET Controller", fn: "sys", io: null, ch: 1, w: 24, ebus: -400, c24: true, desc: "2 × RJ45, switched; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6652", name: "EtherNet/IP Master", fn: "sys", io: null, ch: 1, w: 24, ebus: -400, c24: true, desc: "2 × RJ45, switched; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6751", name: "CANopen Master", fn: "sys", io: null, ch: 1, w: 24, ebus: -230, c24: true, desc: "CANopen, D-sub 9 male; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
   // — communication additions from Beckhoff catalog 2026 (approximate) —
-  { id: "EL6002", name: "2-Ch Serial RS232",     fn: "sys", io: null, ch: 2, w: 12, ebus: -110 },
-  { id: "EL6022", name: "2-Ch Serial RS422/RS485", fn: "sys", io: null, ch: 2, w: 12, ebus: -110 },
-  { id: "EL6070", name: "License Key Terminal",  fn: "sys", io: null, ch: 0, w: 12, ebus: -100, desc: "TwinCAT 3 license dongle" },
-  { id: "EL6080", name: "NOVRAM Memory 128kB",   fn: "sys", io: null, ch: 0, w: 12, ebus: -100, desc: "Non-volatile memory terminal" },
-  { id: "EL6090", name: "Display Terminal",      fn: "sys", io: null, ch: 0, w: 12, ebus: -100, desc: "LCD display, 2×16 characters" },
-  { id: "EL6614", name: "4-Port Ethernet Switch", fn: "sys", io: null, ch: 4, w: 26, ebus: -250, rj: 4, desc: "Ethernet switchport terminal, 4× RJ45 (width approximate)" },
-  { id: "EL6688", name: "IEEE 1588 PTP Sync",    fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1, desc: "External synchronization, PTP grandmaster/slave" },
-  { id: "EL6692", name: "EtherCAT Bridge",       fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1, desc: "Couples two EtherCAT segments" },
-  { id: "EL6695", name: "EtherCAT Bridge fast",  fn: "sys", io: null, ch: 1, w: 12, ebus: -180, rj: 1, desc: "Full-featured segment bridge" },
-  { id: "EL6731", name: "PROFIBUS Master",       fn: "sys", io: null, ch: 1, w: 12, ebus: -150, desc: "12 Mbit/s, DB9" },
-  { id: "EL6752", name: "DeviceNet Master",      fn: "sys", io: null, ch: 1, w: 12, ebus: -150 },
+  { id: "EL6002", name: "2-Ch Serial RS232", fn: "sys", io: null, ch: 2, w: 24, ebus: -170, c24: true, desc: "2 × D-sub 9 male; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6022", name: "2-Ch Serial RS422/RS485", fn: "sys", io: null, ch: 2, w: 24, ebus: -270, c24: true, desc: "2 × D-sub 9 female; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6070", name: "License Key Terminal",  fn: "sys", io: null, ch: 0, w: 12, ebus: -120, desc: "TwinCAT 3 license dongle" },
+  { id: "EL6080", name: "Memory Terminal 128 kB", fn: "sys", io: null, ch: 0, w: 12, ebus: -130, desc: "Non-volatile memory terminal" },
+  { id: "EL6090", name: "Display Terminal", fn: "sys", io: null, ch: 0, w: 24, ebus: -80, c24: true, desc: "LCD, 2 × 16 characters, navigation switch; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6614", name: "4-Port Ethernet Switch", fn: "sys", io: null, ch: 4, w: 24, ebus: -310, c24: true, desc: "4 × RJ45; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6688", name: "IEEE 1588 PTP Sync", fn: "sys", io: null, ch: 1, w: 24, ebus: -310, c24: true, desc: "External synchronization, 1 × RJ45; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6692", name: "EtherCAT Bridge", fn: "sys", io: null, ch: 1, w: 24, ebus: -120, c24: true, desc: "X1 IN / X2 OUT, 24 V for the secondary side on X3 (typ. 60 mA); 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6695", name: "EtherCAT Bridge fast", fn: "sys", io: null, ch: 1, w: 24, ebus: -400, c24: true, desc: "X1 IN / X2 OUT, 24 V for the secondary side on X3 (typ. 70 mA); 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6731", name: "PROFIBUS Master", fn: "sys", io: null, ch: 1, w: 24, ebus: -200, c24: true, desc: "12 Mbit/s, D-sub 9 female; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
+  { id: "EL6752", name: "DeviceNet Master", fn: "sys", io: null, ch: 1, w: 24, ebus: -260, c24: true, desc: "DeviceNet, 5-pin open-style plug; 24 mm EL-24 housing (verified, beckhoff.com / Infosys)" },
   // --- Motion / Drives (DIN-rail drive terminals) ---
-  { id: "EL7031", name: "Stepper 24V 1.5A",      fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
-  { id: "EL7041", name: "Stepper 50V 5A + enc",  fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
-  { id: "EL7047", name: "Stepper 50V 5A vector", fn: "mot", io: null, ch: 1, w: 12, ebus: -120 },
-  { id: "EL7211", name: "Servo 50V 4.5A OCT",    fn: "mot", io: null, ch: 1, w: 12, ebus: -140 },
-  { id: "EL7222", name: "2-Ch Servo 50V 2×3A OCT", fn: "mot", io: null, ch: 2, w: 24, ebus: -180 },
-  { id: "EL7332", name: "2-Ch DC Motor 24V 1A",  fn: "mot", io: null, ch: 2, w: 12, ebus: -110 },
-  { id: "EL7342", name: "2-Ch DC Motor 50V 3.5A", fn: "mot", io: null, ch: 2, w: 12, ebus: -120 },
+  { id: "EL7031", name: "Stepper 24V 1.5A",      fn: "mot", io: null, ch: 1, w: 12, ebus: -120 },
+  { id: "EL7041", name: "Stepper 50V 5A + enc",  fn: "mot", io: null, ch: 1, w: 24, ebus: -140, blk: "el2x8", pinout: EL7041_PINS, desc: "24 mm, 2 × 8 clamps; pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "EL7047", name: "Stepper 50V 5A vector", fn: "mot", io: null, ch: 1, w: 24, ebus: -140, blk: "el2x8", pinout: EL7041_PINS, desc: "24 mm, 2 × 8 clamps, same points as the EL7041 (Infosys, verified, beckhoff.com / Infosys)" },
+  { id: "EL7211", name: "Servo 50V 4.5A resolver", fn: "mot", io: null, ch: 1, w: 24, ebus: -120, blk: "hd2x16", pinout: [...EL7211_PINS, ...NC16], desc: "24 mm, 2 × 16 clamps, right block not connected; resolver feedback (Infosys, verified, beckhoff.com / Infosys)" },
+  { id: "EL7211-0010", name: "Servo 50V 4.5A OCT",  fn: "mot", io: null, ch: 1, w: 24, ebus: -120, blk: "hd2x16", pinout: [...EL7211_0010_PINS, ...NC16], desc: "One Cable Technology; 24 mm, 2 × 16 clamps, right block not connected (Infosys, verified, beckhoff.com / Infosys)" },
+  { id: "EL7332", name: "2-Ch DC Motor 24V 1A",  fn: "mot", io: null, ch: 2, w: 12, ebus: -140 },
+  { id: "EL7342", name: "2-Ch DC Motor 50V 3.5A", fn: "mot", io: null, ch: 2, w: 24, ebus: -140, blk: "el2x8", pinout: EL7342_PINS, desc: "24 mm, 2 × 8 clamps; pinout from Infosys (verified, beckhoff.com / Infosys)" },
   // — motion additions from Beckhoff catalog 2026 (approximate) —
-  { id: "EL7037", name: "Stepper 24V 1.5A vector", fn: "mot", io: null, ch: 1, w: 12, ebus: -140 },
-  { id: "EL7201", name: "Servo 50V 2.8A OCT",    fn: "mot", io: null, ch: 1, w: 12, ebus: -120, desc: "One Cable Technology for AM81xx" },
-  { id: "EL7411", name: "BLDC Motor 50V 4.5A",   fn: "mot", io: null, ch: 1, w: 12, ebus: -140, desc: "Brushless DC with hall/encoder feedback" },
+  { id: "EL7037", name: "Stepper 24V 1.5A vector", fn: "mot", io: null, ch: 1, w: 12, ebus: -100 },
+  { id: "EL7201", name: "Servo 50V 2.8A resolver", fn: "mot", io: null, ch: 1, w: 12, ebus: -120, hd: true, pinout: EL7201_PINS, desc: "16 clamps, resolver feedback (Infosys, verified, beckhoff.com / Infosys)" },
+  { id: "EL7411", name: "BLDC Motor 50V 4.5A",   fn: "mot", io: null, ch: 1, w: 24, ebus: -190, blk: "hd2x16", pinout: EL7411_PINS, desc: "Brushless DC with Hall / encoder feedback; 24 mm, 2 × 16 clamps (Infosys, verified, beckhoff.com / Infosys)" },
+  // — ED communication / encoder / drive terminals (beckhoff.com, 2026) —
+  { id: "ED6001-0009", name: "Serial RS232 D-sub",       fn: "sys", io: null, ch: 1, w: 24, ebus: -120, c24: true, ed: true, desc: "ED-24 housing, D-sub 9 (beckhoff.com; E-bus not listed, EL6001 value)" },
+  { id: "ED6002-0009", name: "2-Ch Serial RS232 D-sub",  fn: "sys", io: null, ch: 2, w: 24, ebus: -170, c24: true, ed: true, desc: "ED-24 housing, 2 × D-sub 9 (beckhoff.com; E-bus not listed, EL6002 value)" },
+  { id: "ED6011", name: "Serial RS232/422/485 push-in",   fn: "sys", io: null, ch: 1, w: 12, ebus: -190, ed: true, hd: true, desc: "ED series, push-in, 16 points (beckhoff.com; pinout not yet verified)" },
+  { id: "ED6012", name: "2-Ch Serial RS232/422/485 push-in", fn: "sys", io: null, ch: 2, w: 12, ebus: -190, ed: true, hd: true, desc: "ED series, push-in, 16 points (beckhoff.com; pinout not yet verified)" },
+  { id: "ED6060", name: "Bluetooth Diagnostics Interface", fn: "sys", io: null, ch: 0, w: 12, ebus: -65, ed: true, desc: "Interface for the Beckhoff Diagnostics app (beckhoff.com)" },
+  { id: "ED6224", name: "IO-Link Master 4-port push-in", fn: "sys", io: null, ch: 4, w: 12, ebus: -120, ed: true, hd: true, pinout: ED6224_PINS, desc: "ED series, push-in; pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "ED6781", name: "M-Bus Master push-in",          fn: "sys", io: null, ch: 1, w: 12, ebus: -70, ed: true, desc: "ED series, push-in, 8 points (beckhoff.com; pinout not yet verified)" },
+  { id: "ED5002", name: "2-Ch SSI Encoder push-in",      fn: "mot", io: null, ch: 2, w: 12, ebus: -90, ed: true, hd: true, desc: "ED series, push-in, 16 points (beckhoff.com; pinout not yet verified)" },
+  { id: "ED5112", name: "Incremental Encoder 2×AB / 1×ABC push-in", fn: "mot", io: null, ch: 2, w: 12, ebus: -100, ed: true, hd: true, pinout: ED5112_PINS, desc: "ED series, push-in; pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "ED7062", name: "2-Ch Stepper 48V 3A + enc push-in", fn: "mot", io: null, ch: 2, w: 24, ebus: -175, ed: true, blk: "ed2x16", pinout: ED7062_PINS, desc: "ED-24, 2 × 16 push-in points; pinout from Infosys (verified, beckhoff.com / Infosys)" },
+  { id: "ED7211-0010", name: "Servo 48V 4.5A OCT push-in", fn: "mot", io: null, ch: 1, w: 12, ebus: -175, ed: true, hd: true, desc: "ED series, push-in, One Cable Technology (beckhoff.com; pinout not yet verified)" },
   // --- Power Supplies (PS series, DIN rail) ---
   { id: "PS1011-2401", name: "PSU 24V 1A 1-phase",  fn: "psu", io: null, ch: 0, w: 32, ebus: 0, psu: true, psuV: 24, psuA: 1,  out: "24 V DC \u00b7 1 A",  desc: "1-phase 100-240 V AC in, 24 V DC 1 A out (approximate)" },
   { id: "PS1011-2405", name: "PSU 24V 5A 1-phase",  fn: "psu", io: null, ch: 0, w: 39, ebus: 0, psu: true, psuV: 24, psuA: 5,  out: "24 V DC \u00b7 5 A",  desc: "1-phase 100-240 V AC in, 24 V DC 5 A out" },
@@ -855,9 +914,9 @@ export const GROUPS = [
   { key: "do",   title: "Digital Output",     ids: ["EL2002", "EL2004", "EL2008", "EL2022", "EL2024", "EL2032", "EL2042", "EL2084", "EL2088", "EL2124", "EL2202", "EL2262", "EL2502", "EL2521", "EL2522", "EL2535", "EL2564", "EL2595", "EL2602", "EL2612", "EL2622", "EL2624", "EL2634", "EL2652", "EL2712", "EL2722", "EL2798", "EL2808", "EL2809", "EL2819", "EL2828", "EL2889"] },
   { key: "ai",   title: "Analog Input",       ids: ["EL3001", "EL3002", "EL3004", "EL3008", "EL3021", "EL3042", "EL3044", "EL3048", "EL3052", "EL3054", "EL3058", "EL3061", "EL3062", "EL3064", "EL3068", "EL3101", "EL3102", "EL3104", "EL3121", "EL3124", "EL3142", "EL3144", "EL3152", "EL3154", "EL3162", "EL3164", "EL3174", "EL3201", "EL3202", "EL3204", "EL3208", "EL3214", "EL3218", "EL3255", "EL3311", "EL3312", "EL3314", "EL3318", "EL3351", "EL3356", "EL3403", "EL3443", "EL3453", "EL3602", "EL3612", "EL3632", "EL3681", "EL3702", "EL3742", "EL3751"] },
   { key: "ao",   title: "Analog Output",      ids: ["EL4001", "EL4002", "EL4004", "EL4008", "EL4011", "EL4012", "EL4014", "EL4018", "EL4021", "EL4022", "EL4024", "EL4028", "EL4031", "EL4032", "EL4034", "EL4038", "EL4102", "EL4104", "EL4112", "EL4114", "EL4122", "EL4124", "EL4134", "EL4712", "EL4732"] },
-  { key: "pos",  title: "Position / Encoder", ids: ["EL5001", "EL5002", "EL5021", "EL5032", "EL5042", "EL5072", "EL5101", "EL5102", "EL5112", "EL5131", "EL5151", "EL5152"] },
-  { key: "com",  title: "Communication",      ids: ["EL6001", "EL6002", "EL6021", "EL6022", "EL6070", "EL6080", "EL6090", "EL6224", "EL6601", "EL6614", "EL6631", "EL6652", "EL6688", "EL6692", "EL6695", "EL6731", "EL6751", "EL6752"] },
-  { key: "mot",  title: "Motion / Drives",    ids: ["EL7031", "EL7037", "EL7041", "EL7047", "EL7201", "EL7211", "EL7222", "EL7332", "EL7342", "EL7411"] },
+  { key: "pos",  title: "Position / Encoder", ids: ["EL5001", "EL5002", "EL5021", "EL5032", "EL5042", "EL5072", "EL5101", "EL5102", "EL5112", "EL5131", "EL5151", "EL5152", "ED5002", "ED5112"] },
+  { key: "com",  title: "Communication",      ids: ["EL6001", "EL6002", "EL6021", "EL6022", "EL6070", "EL6080", "EL6090", "EL6224", "EL6601", "EL6614", "EL6631", "EL6652", "EL6688", "EL6692", "EL6695", "EL6731", "EL6751", "EL6752", "ED6001-0009", "ED6002-0009", "ED6011", "ED6012", "ED6060", "ED6224", "ED6781"] },
+  { key: "mot",  title: "Motion / Drives",    ids: ["EL7031", "EL7037", "EL7041", "EL7047", "EL7201", "EL7211", "EL7211-0010", "EL7332", "EL7342", "EL7411", "ED7062", "ED7211-0010"] },
   { key: "ed",   title: "ED series (push-in)", ids: ["ED1008", "ED1808", "ED1809", "ED1819", "ED1829", "ED1839", "ED1859", "ED1889", "ED2008", "ED2032", "ED2034", "ED2808", "ED2809", "ED2828", "ED2838", "ED2889", "ED3072", "ED3074", "ED3078", "ED3172", "ED3174", "ED4072", "ED4074", "ED4078", "ED4172", "ED4174"] },
   { key: "saf",  title: "TwinSAFE",           ids: ["EL1904", "EL1918", "EL2904", "EL2911", "EL2912", "EL6910", "EL6930"] },
   { key: "src",   title: "Power Sources & Feeds", ids: [] },

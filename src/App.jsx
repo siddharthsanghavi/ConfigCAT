@@ -113,7 +113,7 @@ const CAT_LABEL = {
   cplr: "Couplers & Junctions", epc: "Embedded PCs", pc: "Industrial PCs", pnl: "Panels & HMI",
   di: "Digital Input", do: "Digital Output", ai: "Analog Input", ao: "Analog Output",
   pos: "Position & Encoder", mot: "Motion Terminals", com: "Communication",
-  saf: "TwinSAFE", sys: "System & Power Terminals",
+  ed: "ED I/O (push-in)", saf: "TwinSAFE", sys: "System & Power Terminals",
   klbus: "KL Bus Terminals (K-bus)", w750: "WAGO 750 I/O",
   iobox: "IP67 I/O & IO-Link", drv: "Drives & Motors", sens: "Sensors",
   hmi: "Operators & Signaling", safe: "Safety Devices", pneu: "Pneumatics & Valves",
@@ -121,7 +121,7 @@ const CAT_LABEL = {
   pwr: "Power & Distribution", src: "Power Sources",
 };
 // controllers first, then rail I/O, then field devices, then supporting kit
-const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "pos", "mot", "com", "saf",
+const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "ed", "pos", "mot", "com", "saf",
   "sys", "klbus", "w750", "iobox", "drv", "sens", "hmi", "safe", "pneu", "net", "sw", "pwr", "src"];
 // how many matched parts a search may auto-expand before the palette leaves the
 // company folders closed instead (1500-odd buttons per keystroke is not useful)
@@ -155,6 +155,8 @@ const WIRES = [
   { id: "dp",   name: "DisplayPort cable",              stroke: "#5A616C", w: 3.8, net: "dp",   conn: "plug" },
   { id: "cpl4", name: "CP-Link 4 — panel link over Cat.6A (CU8803)", stroke: "#C9A227", w: 3.6, net: "dp", conn: "rj45" },
   { id: "dvi",  name: "DVI-D cable",                    stroke: "#8A8F98", w: 3.8, net: "dvi",  conn: "plug" },
+  // fieldbus / serial cabling on the EL6xxx connectors (board 06)
+  { id: "fbus", name: "Fieldbus cable — D-sub 9 / DeviceNet plug (PROFIBUS, CAN, serial)", stroke: "#8E44AD", w: 3.4, net: "bus", conn: "dsub" },
 ];
 const wireById = Object.fromEntries(WIRES.map((w) => [w.id, w]));
 // simulation: halo on a wire by the level its net sits at
@@ -197,6 +199,8 @@ const NET_FEASIBLE = {
   "dp+dvi": ["dp", "dvi"],
   "dvi+hdmi": ["dvi", "hdmi"],
   "oct+oct": ["oct"],
+  "dsub+dsub": ["fbus"],
+  "dnet+dnet": ["fbus"],
 };
 // field devices that come with a pre-configured connection cable; the
 // device setting `cbl` switches between "m12" (default) and "braid"
@@ -281,11 +285,15 @@ function reseedSeq(rails, free = []) {
   SEQ = m + 1;
 }
 // accept only known parts / resolvable wire endpoints from stored or loaded JSON
+// parts renamed after a catalog check (board 06): old id -> current id
+const RENAMED = { EL7222: "EL7211-0010" };
 function sanitizeDoc(raw) {
   if (!raw || !Array.isArray(raw.rails)) return null;
   const rails = raw.rails.map((r, i) => ({
     id: r?.id || `r${i + 1}`,
-    items: (Array.isArray(r?.items) ? r.items : []).filter((it) => it && it.uid && byId[it.catId]),
+    items: (Array.isArray(r?.items) ? r.items : [])
+      .map((it) => (it && RENAMED[it.catId] ? { ...it, catId: RENAMED[it.catId] } : it))
+      .filter((it) => it && it.uid && byId[it.catId]),
   }));
   const free = (Array.isArray(raw.free) ? raw.free : []).filter(
     (f) => f && f.uid && byId[f.catId]?.free && Number.isFinite(f.x) && Number.isFinite(f.y)
@@ -427,6 +435,27 @@ function portCount(d) {
   if (typeof d.rj === "number" && d.rj > 1) return d.rj;
   return d.junction && !d.fiber ? 2 : 1;
 }
+// EL-24 compact connector terminals (board 06, product pictures): status
+// LEDs [text, colour(s), state], connectors [kind, y, label] at x 44.
+// Shared by pointGeom (ports) and Comm24Face (drawing).
+const RJ2 = [["rj45", 124, "X1"], ["rj45", 214, "X2"]];
+const C24 = {
+  EL6601: { leds: [["Run", "g", "run"], ["", ""], ["Eth Err", "r"]], ports: [["rj45", 122, "X1"]], sub: "Ethernet" },
+  EL6614: { leds: [["Run", "g", "run"], ["Eth Act", "g", "la"], ["Eth Err", "r"]], ports: [0, 1, 2, 3].map((k) => ["rj45", 88 + 60 * k, `X${k + 1}`]), small: true },
+  EL6631: { leds: [["Run", "g", "run"], ["PN Run/Err", "gr", "run"], ["PN Err", "gr"]], ports: RJ2, sub: "PROFINET" },
+  EL6652: { leds: [["Run", "g", "run"], ["EIP State", "gr", "run"], ["Net State", "r"]], ports: RJ2, sub: "EtherNet/IP" },
+  EL6688: { leds: [["Run", "g", "run"], ["", ""], ["Err", "r"]], ports: [["rj45", 132, "X1"]], sub: "PTP IEEE1588" },
+  EL6692: { leds: [["Run Prim", "g", "run"], ["Run Sec", "g"], ["Power", "g", "run"]], ports: [["rj45", 124, "X1"], ["rj45", 206, "X2"]], bridge: true, x3: true },
+  EL6695: { leds: [["Status Prim", "g", "run"], ["Status Sec", "g"], ["Power/Err", "g", "run"]], ports: [["rj45", 124, "X1"], ["rj45", 206, "X2"]], bridge: true, x3: true },
+  EL6731: { leds: [["Run", "g", "run"], ["BF", "r"], ["CPU Err", "r"]], ports: [["dsub", 142, "X1"]], female: true, sub: "PROFIBUS" },
+  EL6751: { leds: [["Run", "g", "run"], ["CAN Err", "r"], ["CPU Err", "r"]], ports: [["dsub", 142, "X1"]], sub: "CANopen" },
+  EL6752: { leds: [["Run", "g", "run"], ["MNS", "gr", "run"], ["", "r"]], ports: [["dnet", 127.5, "X1"]], sub: "DeviceNet" },
+  EL6002: { leds: [["Run", "g", "run"], ["Rx/Tx Ch1", "gy"], ["Rx/Tx Ch2", "gy"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], sub: "RS232" },
+  EL6022: { leds: [["Run", "g", "run"], ["Rx/Tx Ch1", "gy"], ["Rx/Tx Ch2", "gy"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], female: true, sub: "RS485" },
+  EL6090: { display: true },
+  "ED6001-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"]], ports: [["dsub", 142, "X1"]], female: true, sub: "RS232" },
+  "ED6002-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"], ["Ch2 Rx/Tx/Err", "gr"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], female: true, sub: "RS232" },
+};
 function pointGeom(d) {
   const W = Math.round(d.w * PX_PER_MM);
   const pts = [];
@@ -479,6 +508,17 @@ function pointGeom(d) {
       pts.push({ x: hx, y: 189, label: "X2", port: "rj45", size: 10 });
     }
     return { W, pts, block: { cplr: true, bx, cols: c12 } };
+  }
+  if (d.c24) {
+    // EL-24 connector terminals (must mirror Comm24Face): the connectors as
+    // ports; the EL6692 / EL6695 X3 plug carries the secondary-side 24 V
+    const f = C24[d.id] || {};
+    (f.ports || []).forEach(([kind, y, lab]) => pts.push({ x: 44, y, label: lab, port: kind, size: 10 }));
+    if (f.x3) {
+      pts.push({ x: 34.5, y: 259, label: "24V", size: 5, round: true, plug: true, role: "p24", tip: "X3 24 V — supply of the secondary (EtherCAT) side" });
+      pts.push({ x: 34.5, y: 275, label: "0V", size: 5, round: true, plug: true, role: "gnd", tip: "X3 0 V — secondary side supply return" });
+    }
+    return { W, pts, block: { cplr: true, bx: null, c24: true } };
   }
   if (d.ext || d.junction || d.rj) {
     // network ports only — appended as wireable points (match RjTermFace)
@@ -549,6 +589,19 @@ function pointGeom(d) {
   // io / dist / motion / position / plain comm
   const hd = !!d.hd;
   const cols = [W * 0.30, W * 0.70];
+  // 24 mm with two 16-point blocks (board 06): points 1-16 the left block,
+  // 17-32 the right (the manuals' 1′-16′); ED (push-in) or HD (EL)
+  if (d.blk === "ed2x16" || d.blk === "hd2x16") {
+    const isEd = d.blk === "ed2x16";
+    const c4 = isEd ? [53 * 0.31, 53 * 0.69, 53 + 53 * 0.31, 53 + 53 * 0.69] : [17, 36, 70, 89];
+    for (let p = 0; p < 32; p++) {
+      const q = p % 16, col = (p >> 4) * 2 + (q < 8 ? 0 : 1);
+      pts.push(isEd
+        ? { x: c4[col], y: edPointY({ hd: true }, q), label: String(p + 1), size: 6.5, col, round: true, sq: true }
+        : { x: c4[col], y: HD16.rows[q % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2 });
+    }
+    return { W, pts, block: isEd ? { cols: c4, ed: true, ed2: true } : { cols: c4, hd16: true, hd2: true } };
+  }
   if (d.ed) {
     // ED push-in terminals (must mirror EdFace)
     const ce = [W * 0.31, W * 0.69], n = hd ? 16 : 8;
@@ -575,13 +628,13 @@ function pointGeom(d) {
     }
     return { W, pts, block: { cols, top, bot, rows, hd } };
   }
-  // TwinSAFE 24 mm (EL2904 / EL2911): two 12 mm halves, clamps 1-8 left,
-  // 9-16 right (the manuals' 1'-8')
-  if (d.safety && d.w === 24) {
+  // 24 mm with two 12 mm halves (TwinSAFE EL2904 / EL2911, board 06
+  // EL7041 / EL5101 ...): clamps 1-8 left, 9-16 right (the manuals' 1'-8')
+  if (d.w === 24 && (d.safety || d.blk === "el2x8")) {
     const c4 = [17, 36, 70, 89];
     for (let p = 0; p < 16; p++) {
       const col = Math.floor(p / 4), row = p % 4;
-      pts.push({ x: c4[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true, ys: true });
+      pts.push({ x: c4[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true, ys: !!d.safety });
     }
     return { W, pts, block: { cols: c4, gTop: EL12.gTop, gh: EL12.gh, el12: true, el24: true } };
   }
@@ -880,6 +933,8 @@ function pointRole(d, p) {
   if (p.tip) return p.tip;
   if (p.port) {
     if (p.port === "fo") return `${lb} — fiber optic port`;
+    if (p.port === "dsub") return `${lb} — D-sub 9 ${C24[d.id]?.female ? "socket" : "plug"} (${C24[d.id]?.sub || "fieldbus"})`;
+    if (p.port === "dnet") return `${lb} — DeviceNet 5-pin open-style plug`;
     if (lb === "OUT") return "OUT — E-bus extension to next station (RJ45)";
     if (lb === "X1" && d.coupler) return "X1 IN — EtherCAT from master (RJ45)";
     if (lb === "X2" && d.coupler) return "X2 OUT — EtherCAT to next station (RJ45)";
@@ -972,6 +1027,10 @@ function pointRole(d, p) {
   if (d.pinout) {
     const pi = d.pinout[n - 1];
     if (pi) {
+      // motion / encoder clamps: the manual's name (24 mm: right block 1′…)
+      const half = d.blk === "el2x8" ? 8 : d.blk ? 16 : 0;
+      const tag = half && n > half ? `Pt ${n - half}′` : `Pt ${n}`;
+      if (pi.t && (!pi.r || pi.r === "p24" || pi.r === "gnd")) return `${tag} — ${pi.t}`;
       if (pi.r === "di") return `Pt ${n} \u2014 digital input ${pi.ch} (signal sink)`;
       if (pi.r === "do") return `Pt ${n} \u2014 digital output ${pi.ch} (sources +24 V)`;
       if (pi.r === "p24") return `Pt ${n} \u2014 +24 V sensor supply (source)`;
@@ -2682,6 +2741,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {compact ? <CompactFace d={d} W={W} sim={sim} /> :
         d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.extM7 ? <ExtensionFace d={d} W={W} sim={sim} /> :
+        cplr && d.c24 ? <Comm24Face d={d} W={W} sim={sim} /> :
         cplr && d.jM7 ? <JunctionFace d={d} W={W} sim={sim} /> :
         d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
         d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
@@ -2831,6 +2891,9 @@ function el12Tab(d, n) {
   }
   const p = d.pinout?.[n - 1];
   const sig = { di: "I", do: "O", ai: "AI", ao: "AO" };
+  if (p?.tab === "+") return { ...EL12_TAB.p24, text: "+", fs: 9 };
+  if (p?.tab === "\u2212") return { ...EL12_TAB.gnd, text: "\u2212", fs: 9 };
+  if (p?.tab) return { ...EL12_TAB.sig, text: p.tab, fs: p.tab.length > 2 ? 5.6 : 7 };
   if (p && sig[p.r]) return { ...EL12_TAB.sig, text: `${sig[p.r]}${p.ch ?? ""}`, fs: p.r.length > 1 && p.r[0] === "a" ? 6 : 7 };
   if (p?.r === "p24") return { ...EL12_TAB.p24, text: "+", fs: 9 };
   if (p?.r === "gnd") return { ...EL12_TAB.gnd, text: "−", fs: 9 };
@@ -2893,9 +2956,10 @@ const elMark = (d) => {
 
 // ED push-in face (M7, confirmed on the ED1008 and ED1859). Geometry
 // mirrors pointGeom's ED branch; LED n sits beside clamp n's column.
-function EdFace({ d, W, cols, states }) {
+function EdFace({ d, W, cols, states, print = true, prime = false }) {
   const n = d.hd ? 16 : 8, rows = n / 2;
-  const [mk, mkE] = ED_MARK[d.io] || ED_MARK.di;
+  // communication / encoder / drive EDs carry orange markers (ED7062 picture)
+  const [mk, mkE] = ED_MARK[d.io] || (d.fn === "mot" || d.fn === "sys" ? ["#F0961C", "#BF730E"] : ED_MARK.di);
   // an illustrative Data Matrix pattern, stable per part (not a real code)
   let seed = [...d.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
   const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
@@ -2940,12 +3004,12 @@ function EdFace({ d, W, cols, states }) {
             <rect x={cx - 5.5} y={by + 3} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
             <rect x={cx - 5.5} y={by + 5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
             <circle cx={cx - 0.5} cy={by + 0.6} r="1.7" fill="#2B2E31" />
-            <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{s + 1}</text>
+            <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{s + 1}{prime ? "′" : ""}</text>
           </g>
         );
       })}
-      <text x="5" y={TH - 13.8} fill="#2B2F33" fontSize="6" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.2px" }}>BECKHOFF</text>
-      <text x="5" y={TH - 5.6} fill="#2B2F33" fontSize="5.6" fontWeight="600" fontFamily="ui-monospace,monospace">{d.id}</text>
+      {print && <text x="5" y={TH - 13.8} fill="#2B2F33" fontSize="6" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.2px" }}>BECKHOFF</text>}
+      {print && <text x="5" y={TH - 5.6} fill="#2B2F33" fontSize="5.6" fontWeight="600" fontFamily="ui-monospace,monospace">{d.id}</text>}
     </g>
   );
 }
@@ -2960,7 +3024,7 @@ function pointChannelIdx(d, s) {
 
 // HD 16-point face (M7, confirmed on the EL1859 pilot). Rows mirror
 // pointGeom's hd16 branch; LED n sits beside signal n, 1-8 left, 9-16 right.
-function Hd16Face({ d, W, cols, states, print = true }) {
+function Hd16Face({ d, W, cols, states, print = true, prime = false }) {
   const beckhoff = print && (!d.brand || d.brand === "beckhoff");
   const ysRow = (row) => !!d.safety && (!d.coupler || row >= 5);
   return (
@@ -2987,7 +3051,7 @@ function Hd16Face({ d, W, cols, states, print = true }) {
         <g key={`${row}-${ci}`}>
           <rect x={cx - 6.5} y={cy - 14.5} width="13" height="8.5" rx="1" fill={ysRow(row) ? TS_Y.push : "#B3B7BB"} stroke={ysRow(row) ? TS_Y.pushEdge : "#8C9094"} strokeWidth="0.5" />
           <rect x={cx - 4.5} y={cy - 12.5} width="9" height="4.5" rx="0.6" fill={ysRow(row) ? TS_Y.slot : "#585C60"} />
-          <text x={cx - 9} y={cy - 9} fill={ysRow(row) ? TS_Y.num : "#51565B"} fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{ci * 8 + row + 1}</text>
+          <text x={cx - 9} y={cy - 9} fill={ysRow(row) ? TS_Y.num : "#51565B"} fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{ci * 8 + row + 1}{prime ? "′" : ""}</text>
         </g>
       )))}
       {beckhoff && <text x={W / 2} y="185.2" fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>}
@@ -2999,7 +3063,7 @@ function Hd16Face({ d, W, cols, states, print = true }) {
 // 12 mm EL terminal face (M7, confirmed on the EL1002 pilot). Geometry
 // mirrors pointGeom's el12 branch: rows at EL12.gTop + row·gh, each a tab,
 // a release button and the wire entry (drawn by TerminalG).
-function El12Face({ d, W, cols, states, print = true, n0 = 0 }) {
+function El12Face({ d, W, cols, states, print = true, n0 = 0, prime = false }) {
   const led = (on, x, y, key) => {
     const col = on === "red" ? "#FF3B30" : "#46E36E";
     return (
@@ -3036,7 +3100,7 @@ function El12Face({ d, W, cols, states, print = true, n0 = 0 }) {
             {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
             <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill={ys ? TS_Y.push : "#B3B7BB"} stroke={ys ? TS_Y.pushEdge : "#8C9094"} strokeWidth="0.5" />
             <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill={ys ? TS_Y.slot : "#585C60"} />
-            <text x={cx - 8.2} y={g + 33.6} fill={ys ? TS_Y.num : "#51565B"} fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
+            <text x={cx - 8.2} y={g + 33.6} fill={ys ? TS_Y.num : "#51565B"} fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{prime ? `${n - n0}′` : n}</text>
           </g>
         );
       }))}
@@ -3097,12 +3161,28 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
       <g>
         <rect x="52.6" y="4" width="0.8" height={TH - 8} fill="#000" opacity="0.08" />
         <El12Face d={d} W={53} cols={[17, 36]} states={left} />
-        <g transform="translate(53 0)"><El12Face d={d} W={53} cols={[17, 36]} states={right} print={false} n0={8} /></g>
+        <g transform="translate(53 0)"><El12Face d={d} W={53} cols={[17, 36]} states={right} print={false} n0={8} prime={!d.safety} /></g>
       </g>
     );
   }
   if (b.el12 && PIN_LEDS[d.id]) return <El12Face d={d} W={W} cols={cols} states={PIN_LEDS[d.id].map(() => (sim ? !!sim.up : powered))} />;
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
+  if (b.ed2 || b.hd2) {
+    // two 16-point blocks side by side (board 06); the run LED on the left
+    const st = [ledStates[0] || false];
+    const L = [b.cols[0], b.cols[1]], R = [b.cols[0], b.cols[1]];
+    return (
+      <g>
+        <rect x="52.6" y="4" width="0.8" height={TH - 8} fill="#000" opacity="0.08" />
+        {b.ed2 ? <EdFace d={{ ...d, hd: true }} W={53} cols={L} states={st} />
+          : <Hd16Face d={d} W={53} cols={L} states={st} />}
+        <g transform="translate(53 0)">
+          {b.ed2 ? <EdFace d={{ ...d, hd: true }} W={53} cols={R} states={[]} print={false} prime />
+            : <Hd16Face d={d} W={53} cols={R} states={[]} print={false} prime />}
+        </g>
+      </g>
+    );
+  }
   if (b.ed) {
     const st = Array.from({ length: d.hd ? 16 : 8 }, (_, s) => {
       const i = pointChannelIdx(d, s);
@@ -3397,6 +3477,111 @@ function ExtensionFace({ d, W, sim = null }) {
 }
 
 // EK1122: 24 mm junction, Run LED, EtherCAT mark, X1 OUT / X2 OUT
+// 9-pin D-sub turned upright as on the pictures (board 06)
+function DSub({ cx, cy, female }) {
+  return (
+    <g>
+      <rect x={cx - 17} y={cy - 47} width="34" height="94" rx="4" fill="#C9CDD1" stroke="#8E9398" strokeWidth="0.6" />
+      {[-38, 38].map((dy) => (
+        <g key={dy}>
+          <circle cx={cx} cy={cy + dy} r="5.6" fill="#B2B7BC" stroke="#7E8388" strokeWidth="0.6" />
+          <circle cx={cx} cy={cy + dy} r="2.6" fill="#3E4246" />
+        </g>
+      ))}
+      <path d={`M${cx - 12} ${cy - 27} H${cx + 12} L${cx + 9.5} ${cy + 27} H${cx - 9.5} Z`} fill="#9EA4AA" stroke="#6E7378" strokeWidth="0.8" strokeLinejoin="round" />
+      <path d={`M${cx - 9.5} ${cy - 24.5} H${cx + 9.5} L${cx + 7.4} ${cy + 24.5} H${cx - 7.4} Z`} fill={female ? "#5A5F64" : "#2A2D30"} stroke="#3A3E42" strokeWidth="0.5" />
+      {[0, 1, 2, 3, 4].map((k) => <circle key={`a${k}`} cx={cx - 3.6} cy={cy - 18 + k * 9} r={female ? 1.4 : 1.6} fill={female ? "#1A1C1E" : "#D7B24A"} />)}
+      {[0, 1, 2, 3].map((k) => <circle key={`b${k}`} cx={cx + 3.6} cy={cy - 13.5 + k * 9} r={female ? 1.4 : 1.6} fill={female ? "#1A1C1E" : "#D7B24A"} />)}
+    </g>
+  );
+}
+// orange spring plug (EL6752 DeviceNet, EL6692 / EL6695 X3)
+function OrangePlug({ cx, y0, n, pitch = 17, nums = true }) {
+  return (
+    <g>
+      <rect x={cx - 15} y={y0} width="30" height={n * pitch + 6} rx="2" fill="#F2A21A" stroke="#B87708" strokeWidth="0.6" />
+      {Array.from({ length: n }).map((_, k) => {
+        const y = y0 + 3 + k * pitch;
+        return (
+          <g key={k}>
+            <rect x={cx - 11} y={y + 2} width="11" height={pitch - 4} rx="1.2" fill="#2E3134" />
+            <rect x={cx + 2} y={y + 3.5} width="8" height={pitch - 7} rx="1" fill="#F7C35A" stroke="#C98A10" strokeWidth="0.4" />
+            {nums && <text x={cx + 20} y={y + pitch / 2 + 2} fill="#3A3F44" fontSize="5.2" fontFamily="system-ui">{k + 1}</text>}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+// EL-24 compact housing with a fieldbus connector (board 06, product
+// pictures): orange top bar, status LEDs, connectors from C24 (pointGeom
+// places the ports), light-pipe notches, print at the bottom
+function Comm24Face({ d, W, sim = null }) {
+  const f = C24[d.id] || {};
+  const run = sim ? sim.run || false : true, la = sim ? !!sim.alive : true;
+  const COL = { g: "#46E36E", r: "#FF3B30", y: "#E8C21A" };
+  const lit = (k) => (k === "run" ? run : k === "la" ? la : false);
+  const T = (x, y, t, o = {}) => <text x={x} y={y} fill="#3A3F44" fontSize={o.fs || 6} fontWeight={o.fw || 600} fontFamily="system-ui" textAnchor={o.a || "start"}>{t}</text>;
+  return (
+    <g>
+      <rect x="22" y="2" width="62" height="7" rx="1" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
+      {[0, 1, 2, 3, 4].map((i) => <rect key={i} x={W - 3.4} y={26 + i * 12} width="2.6" height="5" rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />)}
+      {(f.leds || []).map(([t, c, k], i) => {
+        const cy = 22 + i * 10.5, on = c && lit(k);
+        return (
+          <g key={i}>
+            <circle cx="36" cy={cy} r="3.6" fill="#4A4E52" />
+            {on && <circle cx="36" cy={cy} r="3.6" fill={COL[c[0]]} />}
+            {on && <circle cx="36" cy={cy} r="3.6" fill={COL[c[0]]} opacity="0.55" filter="blur(1.4px)" />}
+            {t && <text x="43" y={cy + 2.1} fill="#3A3F44" fontSize="5.6" fontFamily="system-ui">{t}</text>}
+          </g>
+        );
+      })}
+      {f.bridge && (
+        <g>
+          <text x="14" y="72" fill="#3A3F44" fontSize="9" fontWeight="500" fontFamily="system-ui">Ether<tspan fontWeight="800">CAT</tspan></text>
+          {T(22, 82, "BRIDGE", { fs: 7 })}
+        </g>
+      )}
+      {(f.ports || []).map(([kind, y, lab], i) => (
+        <g key={i}>
+          {kind === "rj45" && (f.small
+            ? <g transform={`translate(44 ${y}) scale(0.84) translate(-44 ${-y})`}><RjJack cx={44} cy={y} contacts="left" la={la} top="#C9B23A" bot="#46E36E" /></g>
+            : <RjJack cx={44} cy={y} contacts="left" la={la} top="#C9B23A" bot="#46E36E" />)}
+          {kind === "rj45" && (f.bridge
+            ? <g>{T(74, y - 14, i ? "OUT" : "IN")}{T(74, y - 7, lab)}</g>
+            : T(f.small ? 72 : 74, y - (f.small ? 10 : 14), lab))}
+          {kind === "dsub" && <g><DSub cx={44} cy={y} female={f.female} />{T(65, y + 2, lab)}</g>}
+          {kind === "dnet" && <g>{T(38, y - 51.5, lab)}<OrangePlug cx={44} y0={y - 45.5} n={5} /></g>}
+        </g>
+      ))}
+      {f.x3 && (
+        <g>
+          <OrangePlug cx={40} y0={248} n={2} pitch={16} nums={false} />
+          {T(64, 260, "24V", { fs: 5.6, fw: 400 })}{T(64, 270, "X3", { fs: 5.6, fw: 400 })}{T(64, 280, "0V", { fs: 5.6, fw: 400 })}
+        </g>
+      )}
+      {f.display && (
+        <g>
+          <circle cx="53" cy="54" r="22" fill="#D9DCDF" stroke="#8E9398" strokeWidth="0.8" />
+          <circle cx="53" cy="54" r="17" fill="#2E3134" stroke="#1A1C1E" strokeWidth="0.6" />
+          <circle cx="53" cy="54" r="13" fill="#3E4246" />
+          <text x="53" y="56" fill="#C9CCCF" fontSize="5.6" fontFamily="system-ui" textAnchor="middle">nav</text>
+          {T(53, 88, "enter", { fs: 5.2, fw: 400, a: "middle" })}
+          <rect x="38" y="92" width="30" height="7" rx="3.5" fill="#3E4246" />
+          <rect x="34" y="116" width="38" height="170" rx="2" fill="#B7BBBF" stroke="#8E9398" strokeWidth="0.6" />
+          <rect x="37" y="119" width="32" height="164" rx="1" fill={run ? "#24303A" : "#1D2124"} />
+          {run && <text x="52" y="278" fill="#E6E8EA" fontSize="10" fontWeight="600" fontFamily="ui-monospace,monospace" transform="rotate(-90 52 278)" style={{ letterSpacing: "1px" }}>BECKHOFF</text>}
+          {run && <text x="64" y="278" fill="#E6E8EA" fontSize="10" fontWeight="600" fontFamily="ui-monospace,monospace" transform="rotate(-90 64 278)" style={{ letterSpacing: "1px" }}>{d.id}</text>}
+        </g>
+      )}
+      {f.sub && T(W - 14, 304, f.sub, { fs: 6.4, a: "end" })}
+      <text x="10" y="320" fill="#2B2F33" fontSize="6.6" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>
+      <text x={d.id.length > 6 ? 56 : 62} y="320" fill="#2B2F33" fontSize={d.id.length > 6 ? 5 : 6.4} fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
+    </g>
+  );
+}
+
 function JunctionFace({ d, W, sim = null }) {
   const run = sim ? sim.run || false : true, la = sim ? !!sim.alive : true;
   return (
@@ -4359,6 +4544,10 @@ function PortGlyph({ x, y, kind, label }) {
             <circle key={i} cx={x + dx} cy={y + dy} r="0.9" fill="#26282B" />
           ))}
         </g>
+      ) : kind === "dsub" ? (
+        <path d={`M ${x - 7} ${y - 5} h 14 l -2 10 h -10 z`} fill="#9EA4AA" stroke="#54585C" strokeWidth="0.8" />
+      ) : kind === "dnet" ? (
+        <rect x={x - 4} y={y - 7} width="8" height="14" rx="1" fill="#F2A21A" stroke="#B87708" strokeWidth="0.8" />
       ) : kind === "usb" ? (
         <rect x={x - 6.5} y={y - 3.5} width="13" height="7" rx="1" fill="#1E2126" stroke="#8A9096" strokeWidth="0.8" />
       ) : (

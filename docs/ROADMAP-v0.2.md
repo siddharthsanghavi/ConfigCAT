@@ -417,6 +417,23 @@ moves later parts; EL1918 now has 16 points; the EK1914 and EK1960 gain
 their clamps. The EL2911 was catalogued as a potential supply; the manual
 says 4 safe inputs + a 10 A safe output with TwinSAFE Logic.
 
+**Wide and special EL (board 06, confirmed):** faces from the product
+pictures, pinouts from Infosys (EL7041 / EL7047, EL7342, EL5101, EL5102,
+EL7201, EL7211, EL7211-0010, EL7411, ED5112, ED6224, ED7062); widths and
+E-bus currents from beckhoff.com. Communication terminals with RJ45 /
+D-sub / DeviceNet connectors take the 24 mm `Comm24Face` (EL6601, EL6614,
+EL6631, EL6652, EL6688, EL6692, EL6695, EL6731, EL6751, EL6752, EL6002,
+EL6022, EL6090); D-sub and DeviceNet ports wire with a fieldbus cable.
+Steppers / DC / encoders at 24 mm get two EL halves, servo terminals and
+EL5102 two HD blocks. EL7222 (no product page or manual found) is replaced
+by EL7211-0010; saved projects are mapped. EL5112 is the 2×AB / 1×ABC
+encoder (corrected). ED additions: ED6001-0009, ED6002-0009, ED6011,
+ED6012, ED6060, ED6224, ED6781, ED5002, ED5112, ED7062, ED7211-0010
+(Infosys pinouts only for ED5112, ED6224, ED7062). Saved projects: these
+parts change width (later parts move) and the comm terminals lose their
+old generic clamps, so wires saved on them point at the wrong place and need
+redrawing.
+
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
 (inputs yellow, outputs red, analog in green, analog out blue, from
@@ -447,7 +464,7 @@ in the catalog (12 mm, 8- and 16-point, from beckhoff.com). Still to add:
 | 3 | Feed, distribution, end covers (EL9) | 34 | EL9100, EL9410, EL9150, EL9187, EL9011 |
 | 4 | Couplers and junctions | 26 | EK1100, EK1101-0010, EK1501, EK1110, EK1122 |
 | 5 | TwinSAFE | 9 | EL1904, EL2904, EL6910, EL1918, EK1914, EK1960 |
-| 6 | Wide and special EL | 2 + connector faces | EL6614, EL7222 |
+| 6 | Wide and special EL (done, board 06) | 45 incl. 10 ED | EL6614, EL6731, EL7041, EL7211-0010, ED7062 |
 | 7 | Embedded PCs (CX) | 12 | CX7000, CX8190, CX9020, CX5140, CX2033 |
 | 8 | Power supplies | 8 | PS1011-2410, PS2001-4810, PS3021-2440 |
 | 9 | EtherCAT Box IP67 | 14 | EP1008-0001, EP2338-0001, EP3174-0002 |
