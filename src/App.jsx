@@ -463,7 +463,7 @@ function pointGeom(d) {
     }
     return { W, pts, block: { cols: ce, ed: true } };
   }
-  if (hd && !d.dist && d.fn !== "sys") {
+  if (hd && (d.pins || (!d.dist && d.fn !== "sys"))) {
     // HD terminals: the redrawn face (must mirror Hd16Face)
     const c16 = [W * 0.32, W * 0.68];
     for (let p = 0; p < 16; p++) {
@@ -481,7 +481,7 @@ function pointGeom(d) {
     return { W, pts, block: { cols, top, bot, rows, hd } };
   }
   // 12 mm EL terminals: the redrawn face (must mirror El12Face)
-  if (!d.dist && !d.safety && d.w === 12) {
+  if ((d.pins || !d.dist) && !d.safety && d.w === 12) {
     const c12 = [W * 0.32, W * 0.68];
     for (let p = 0; p < 8; p++) {
       const col = p < 4 ? 0 : 1, row = p % 4;
@@ -801,6 +801,16 @@ function pointRole(d, p) {
     if (lb === "+") return "Up +24 V in \u2014 feeds power contacts (source)";
     if (lb === "\u2212") return "Up 0 V \u2014 power contact return";
     return "PE \u2014 earth power contact";
+  }
+  if (d.pins) {
+    const p = d.pins[Number(lb) - 1];
+    if (p === "p24") return `Pt ${lb} \u2014 +24 V (from the + power contact)`;
+    if (p === "gnd") return `Pt ${lb} \u2014 0 V (from the \u2212 power contact)`;
+    if (p === "pe") return `Pt ${lb} \u2014 PE (from the PE power contact)`;
+    if (p === "up") return `Pt ${lb} \u2014 + power contact (any voltage up to 230 V)`;
+    if (p === "un") return `Pt ${lb} \u2014 \u2212 power contact (any voltage up to 230 V)`;
+    const mates = d.pins.map((q, i) => (q === p && i !== Number(lb) - 1 ? i + 1 : null)).filter(Boolean);
+    return `Pt ${lb} \u2014 free bridge, connected to ${mates.join(", ")} only`;
   }
   if (d.dist) return d.dist === "24V" ? "+24 V source (from power contacts)" : "0 V common (from power contacts)";
   const n = Number(lb);
@@ -2557,7 +2567,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
             <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
           ))}
           <rect x={W - 2} y={hd16 || ed ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill={ed ? "#EE7A3C" : "#F0961C"} stroke={ed ? "#B9561F" : "#BF730E"} strokeWidth="0.5" />
-          {(ed ? [168, 232] : hd16 ? [179, 241] : [179, 246, 310]).map((y) => (
+          {(ed ? [168, 232] : hd16 ? [179, 241] : d.noPE ? [179, 246] : [179, 246, 310]).map((y) => (
             <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
           ))}
         </g>
@@ -2613,8 +2623,15 @@ const FEED_TAB = {
   N: { fill: "#B3B51B", edge: "#85870F", ink: "#2A2B10", text: "N", fs: 7 },
   NC: { fill: "#A19D9A", edge: "#7E7A77", ink: "#A19D9A", text: "", fs: 6 },
 };
+const DIST_TAB = { p24: "+", up: "+", gnd: "−", un: "−", pe: "⏚" };
 function el12Tab(d, n) {
   if (FEED12[d.id]) return FEED_TAB[feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
+  if (d.pins) {
+    // EL9186 / EL9187 carry olive marker tabs numbered across the rows
+    // (01 02 / 03 04 …), the others show their potential
+    if (d.distTabs === "num") return { ...FEED_TAB.L, text: `0${((n - 1) % 4) * 2 + (n <= 4 ? 1 : 2)}`, fs: 6.4 };
+    return FEED_TAB[DIST_TAB[d.pins[n - 1]] || "NC"];
+  }
   const p = d.pinout?.[n - 1];
   const sig = { di: "I", do: "O", ai: "AI", ao: "AO" };
   if (p && sig[p.r]) return { ...EL12_TAB.sig, text: `${sig[p.r]}${p.ch ?? ""}`, fs: p.r.length > 1 && p.r[0] === "a" ? 6 : 7 };
@@ -2660,6 +2677,7 @@ const ED_MARK = { di: ["#EBC31E", "#B8941A"], do: ["#D8322E", "#9E1F1C"], ai: ["
 const elMark = (d) => {
   const f = FEED12[d.id];
   if (f) return f.mark === "grey" ? ["#A8A4A1", "#7E7A77"] : ["#C96E14", "#94500B"]; // feeds: orange, EL9410 grey
+  if (d.pins) return ["#A8A4A1", "#7E7A77"]; // distribution: grey
   return d.io === "do" || d.io === "ai" || d.io === "ao" ? ED_MARK[d.io] : ["#DCD13B", "#A39A22"];
 };
 
@@ -2740,8 +2758,8 @@ function Hd16Face({ d, W, cols, states }) {
       <rect x="4.5" y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W - 25} y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W / 2 - 13.5} y="28" width="27" height="72" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
-      <rect x={W / 2 - 11.5} y="30" width="23" height="68" rx="1" fill="#2C2F32" />
-      {Array.from({ length: 16 }).map((_, s) => {
+      <rect x={W / 2 - 11.5} y="30" width="23" height="68" rx="1" fill={d.pins ? "#4F5859" : "#2C2F32"} />
+      {!d.pins && Array.from({ length: 16 }).map((_, s) => {
         const c = s < 8 ? 0 : 1, y = 32.5 + (s % 8) * 8.4, x = W / 2 - 10 + c * 11, on = states[s];
         const col = on === "red" ? "#FF3B30" : "#46E36E";
         return (

@@ -38,6 +38,15 @@ export function ebusSegments(rails, byId) {
  * from the verified pinout where there is one. */
 export function railPointRole(d, label) {
   const n = Number(label);
+  // distribution terminals: each clamp's potential from the verified table;
+  // b<k> is a free bridge inside the terminal, up / un the + / − contact
+  // of an any-voltage part
+  if (d.pins) {
+    const p = d.pins[n - 1];
+    if (!p) return null;
+    if (p[0] === "b") return { r: "bridge", b: p };
+    return { r: p === "up" ? "p24" : p === "un" ? "gnd" : p, any: p === "up" || p === "un" };
+  }
   if (d.dist) return { r: d.dist === "24V" ? "p24" : "gnd" };
   if (!Number.isFinite(n)) return null;
   if (d.pinout) {

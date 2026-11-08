@@ -29,6 +29,10 @@ export function classifyPoint(d, label) {
     if (label === "0V") return "gnd";
     return "pe";
   }
+  if (d.pins) {
+    const p = d.pins[Number(label) - 1];
+    return p === "p24" || p === "gnd" || p === "pe" ? p : null; // bridges, any-voltage: unknown
+  }
   if (d.dist) return d.dist === "24V" ? "p24" : "gnd";
   const n = Number(label);
   if (!Number.isFinite(n)) return null;

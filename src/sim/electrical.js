@@ -127,6 +127,7 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (role.r === "gnd") to(i, pc0);
           else if (role.r === "pe") to(i, pcpe);
           else if (role.r === "agnd") to(i, `agnd:${uid}`);
+          else if (role.r === "bridge") to(i, `br:${uid}:${role.b}`);
           else if (role.n) to(i, `ch:${uid}:${role.n}`);
         }
       });

@@ -65,6 +65,8 @@ npm run shots          # regenerate README screenshots (see below)
   `feedGroupsFor(d)` (row = clamp pair n / n+4), tabs come from `FEED_TAB`,
   LEDs from `FEED12[id].leds` (`us` E-bus supply, `up` power-contact feed,
   `run`, `diag`). Feed labels `NC` are not connected anywhere.
+  Distribution terminals carry `pins` (one role per clamp); `railPointRole`
+  maps them, and a `b<k>` bridge becomes the node `br:<uid>:b<k>`.
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the

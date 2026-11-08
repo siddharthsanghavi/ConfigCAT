@@ -369,8 +369,14 @@ finder pictures (grey markers on the EL9410, orange on the EL91x0 feeds,
 one Power LED top right). Fixes: EL91x0 clamps 1 / 5 are "not used" (they
 were 24V / 0V tied to the power contacts), the EL9150 point layout was a
 guess (now L on 2 / 6, N on 3 / 7), and the EL9410's clamps 1 / 5 feed the
-E-bus only. Still on the old face: EL918x distribution, EL9080, EL92xx fused
-feeds (6 clamps), EL95xx supplies.
+E-bus only. Distribution terminals (board 03b, confirmed) followed: every EL918x has
+a `pins` table (p24 / gnd / pe per clamp, `b<k>` a free bridge inside the
+terminal, up / un on the any-voltage EL9185-0010), grey markers, an empty
+LED window (12 mm) or plain panel (HD), EL9186 / EL9187 with the olive
+01–08 tabs of the real parts and no PE contact. EL9184 now knows its
+potentials. New: EL9180, EL9181, EL9182, EL9183, EL9185, EL9185-0010.
+Still on the old face: EL9080, EL92xx fused feeds (6 clamps), EL95xx
+supplies.
 
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
