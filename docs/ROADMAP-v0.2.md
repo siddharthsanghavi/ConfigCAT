@@ -336,6 +336,47 @@ rails, PSU and drive on the plate, the E-stop and a stack light on the door,
 and auto-filled glands for the sensor, motor and EP-box cables. It should
 pass the fit and depth checks and export a panel PDF.
 
+### M7 · Beckhoff face redesign — v0.2 scope
+The device faces are rough. Redraw every Beckhoff part from scratch so it
+looks like the real product, one family at a time, with each family's
+first part confirmed on the design canvas before the rest are drawn.
+Other brands come after Beckhoff.
+
+**Per part:** draw it on the canvas from Beckhoff's product picture and
+pinout → the user confirms or marks it up → port it to the app (face
+renderer and `pointGeom` together, so wires still land) → check an app
+screenshot against the reference.
+
+**The pilot settles, once for every family:**
+- Proportions: about 352 px tall (was 292), closer to the real 12 × 100 mm
+  housing. `TH` and every Y offset derived from it move with it.
+- Colour-coded tabs from the pinout: red `+`, blue `−`, green-yellow `⏚`,
+  and signal-type labels (I1/I2…) instead of grey 1–8 tabs.
+- A 4×2 LED window, a release button over a round wire entry for each
+  clamp, small clamp numbers, a horizontal `EL1002 / BECKHOFF` print, and
+  latch hooks top and bottom.
+- Data: every terminal needs a verified pinout (only 8 have one today).
+
+**Families, in order (319 Beckhoff parts):**
+
+| # | Family | Parts | Examples |
+|---|---|---|---|
+| 1 | 12 mm EL terminals (pilot: EL1002) | 158 | EL1004, EL1008, EL2008, EL3004, EL4004 |
+| 2 | HD 16-point EL | 14 | EL1809, EL1819, EL2809, EL1889 |
+| 3 | Feed, distribution, end covers (EL9) | 34 | EL9100, EL9410, EL9150, EL9187, EL9011 |
+| 4 | Couplers and junctions | 26 | EK1100, EK1101-0010, EK1501, EK1110, EK1122 |
+| 5 | TwinSAFE | 7 | EL1904, EL2904, EL6910, EL1918, EL2911 |
+| 6 | Wide and special EL | 2 + connector faces | EL6614, EL7222 |
+| 7 | Embedded PCs (CX) | 12 | CX7000, CX8190, CX9020, CX5140, CX2033 |
+| 8 | Power supplies | 8 | PS1011-2410, PS2001-4810, PS3021-2440 |
+| 9 | EtherCAT Box IP67 | 14 | EP1008-0001, EP2338-0001, EP3174-0002 |
+| 10 | Drives and motors | 6 | AX5103, AX5203, AX8100, AX8206, AM8031 |
+| 11 | IPCs, panels, switches | 25 | C6015, C6030, C6920, CP2915, CU2008 |
+| 12 | K-bus (legacy) | 13 | BK1120, KL1104, KL2408, KL3054, KL9100 |
+
+The faces stay original drawings that resemble the product. No Beckhoff
+photos or logo artwork go into the app (see CLAUDE.md conventions).
+
 ## Also worth doing in v0.2 (small, from the existing roadmap)
 - #23 **Cable schedule** CSV (from–to list): the net graph makes it nearly
   free.
