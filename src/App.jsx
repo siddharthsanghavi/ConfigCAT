@@ -328,6 +328,9 @@ const TH = 336;
 // 12 mm EL face (M7, EL1002 pilot): four clamp rows, each a colour tab, a
 // release button and a round wire entry `entry` px below the row top.
 const EL12 = { gTop: 68, gh: 62.5, entry: 42 };
+// HD 16-point face (M7, EL1859 pilot): eight push-in rows, a gap for the
+// brand print after row 3 and one for the 0 V power contact after row 5.
+const HD16 = { rows: [120, 144.5, 169, 206, 230.5, 268, 292.5, 317] };
 const RAIL_PAD_X = 26;
 const RAIL_GAP = 130;
 const RAIL_TOP = 44; // room for ID badges
@@ -413,6 +416,15 @@ function pointGeom(d) {
   // io / dist / motion / position / plain comm
   const hd = !!d.hd;
   const cols = [W * 0.30, W * 0.70];
+  if (hd && !d.dist && d.fn !== "sys") {
+    // HD terminals: the redrawn face (must mirror Hd16Face)
+    const c16 = [W * 0.32, W * 0.68];
+    for (let p = 0; p < 16; p++) {
+      const col = p < 8 ? 0 : 1;
+      pts.push({ x: c16[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2 });
+    }
+    return { W, pts, block: { cols: c16, hd16: true } };
+  }
   if (hd) {
     const rows = 8, top = 78, bot = TH - 22, pitch = (bot - top) / rows;
     for (let p = 0; p < 16; p++) {
@@ -1278,6 +1290,7 @@ export default function BeckhoffConfigurator() {
         if (d.ebus > 0) supply += d.ebus; else consume += -d.ebus;
         if (d.io === "di") di += d.ch; if (d.io === "do") do_ += d.ch;
         if (d.io === "ai") ai += d.ch; if (d.io === "ao") ao += d.ch;
+        if (d.io === "mix") (d.pinout || []).forEach((p) => { if (p?.r === "di") di++; if (p?.r === "do") do_++; });
       });
       return { supply, consume, mm, over: consume > supply && rail.items.length > 0 };
     });
@@ -2395,7 +2408,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const W = geom.W;
   const uid = inst.uid;
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
-  const el12 = !!geom.block?.el12;
+  const hd16 = !!geom.block?.hd16;
+  const el12 = !!geom.block?.el12 || hd16; // the M7 12 mm housing
 
   return (
     <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
@@ -2466,8 +2480,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         if (p.round) {
           return (
             <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
-              <RoundClamp x={p.x} y={p.y} hl={isPending} />
-              <rect x={p.x - 9.5} y={p.y - 27} width="19" height="36" fill="transparent">
+              <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} />
+              <rect x={p.x - (p.r ? 7.5 : 9.5)} y={p.y - (p.r ? 15.5 : 27)} width={p.r ? 15 : 19} height={p.r ? 22 : 36} fill="transparent">
                 <title>{pointRole(d, p)}</title>
               </rect>
             </g>
@@ -2488,10 +2502,10 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {el12 && (
         <g>
           {[0, 1, 2, 3, 4, 5].map((i) => (
-            <rect key={i} x={W - 1.4} y={29 + i * 14} width="2.6" height="6" rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
+            <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
           ))}
-          <rect x={W - 2} y="208" width="4.2" height="30" rx="1.6" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
-          {[179, 246, 310].map((y) => (
+          <rect x={W - 2} y={hd16 ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
+          {(hd16 ? [179, 241] : [179, 246, 310]).map((y) => (
             <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
           ))}
         </g>
@@ -2549,12 +2563,59 @@ function el12Tab(d, n) {
 }
 
 // round wire entry of a 12 mm EL clamp (the clickable wiring point)
-function RoundClamp({ x, y, hl }) {
+function RoundClamp({ x, y, hl, r }) {
+  const hd = !!r, R = r || 6.2;
   return (
     <g>
-      {hl && <rect x={x - 9.5} y={y - 27} width="19" height="36" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
-      <circle cx={x} cy={y} r="6.2" fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
-      <circle cx={x} cy={y} r="4.4" fill="#2E3134" />
+      {hl && (hd
+        ? <rect x={x - 7.5} y={y - 15.5} width="15" height="22" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />
+        : <rect x={x - 9.5} y={y - 27} width="19" height="36" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />)}
+      <circle cx={x} cy={y} r={R} fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
+      <circle cx={x} cy={y} r={R * 0.7} fill="#2E3134" />
+    </g>
+  );
+}
+
+// index into sim.ch (channel key n - 1) for clamp point s, or -1
+function pointChannelIdx(d, s) {
+  const p = d.pinout?.[s];
+  if (d.io === "mix") return p && SIGNAL_ROLES.includes(p.r) ? s : -1;
+  if (d.pinout) return p && SIGNAL_ROLES.includes(p.r) ? p.ch - 1 : -1;
+  return d.io && s < d.ch ? s : -1;
+}
+
+// HD 16-point face (M7, confirmed on the EL1859 pilot). Rows mirror
+// pointGeom's hd16 branch; LED n sits beside signal n, 1-8 left, 9-16 right.
+function Hd16Face({ d, W, cols, states }) {
+  const beckhoff = !d.brand || d.brand === "beckhoff";
+  return (
+    <g>
+      <text x={W / 2} y="9.2" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      <rect x="4.5" y="12" width="20.5" height="12" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      <rect x={W - 25} y="12" width="20.5" height="12" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      <rect x={W / 2 - 13.5} y="28" width="27" height="72" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x={W / 2 - 11.5} y="30" width="23" height="68" rx="1" fill="#2C2F32" />
+      {Array.from({ length: 16 }).map((_, s) => {
+        const c = s < 8 ? 0 : 1, y = 32.5 + (s % 8) * 8.4, x = W / 2 - 10 + c * 11, on = states[s];
+        const col = on === "red" ? "#FF3B30" : "#46E36E";
+        return (
+          <g key={s}>
+            <rect x={x} y={y} width="9" height="4.5" rx="0.7" fill="#4A4E52" />
+            {on && <rect x={x} y={y} width="9" height="4.5" rx="0.7" fill={col} />}
+            {on && <rect x={x} y={y} width="9" height="4.5" rx="0.7" fill={col} opacity="0.55" filter="blur(1.6px)" />}
+            <text x={c ? W - 9 : 9.6} y={y + 3.6} fill="#51565B" fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{s + 1}</text>
+          </g>
+        );
+      })}
+      {HD16.rows.map((cy, row) => cols.map((cx, ci) => (
+        <g key={`${row}-${ci}`}>
+          <rect x={cx - 6.5} y={cy - 14.5} width="13" height="8.5" rx="1" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
+          <rect x={cx - 4.5} y={cy - 12.5} width="9" height="4.5" rx="0.6" fill="#585C60" />
+          <text x={cx - 9} y={cy - 9} fill="#51565B" fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{ci * 8 + row + 1}</text>
+        </g>
+      )))}
+      {beckhoff && <text x={W / 2} y="185.2" fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>}
+      <rect x="2.5" y="244.4" width={W - 5} height="0.7" fill="#B9BDC1" />
     </g>
   );
 }
@@ -2629,6 +2690,14 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
 
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
+  if (b.hd16) {
+    const hd = Array.from({ length: 16 }, (_, s) => {
+      const i = pointChannelIdx(d, s);
+      if (i < 0) return false;
+      return sim ? !!sim.ch?.[i] : powered && wiredPts.has(`${uid}:${s}`);
+    });
+    return <Hd16Face d={d} W={W} cols={cols} states={hd} />;
+  }
 
   return (
     <g>

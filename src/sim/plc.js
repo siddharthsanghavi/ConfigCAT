@@ -107,7 +107,9 @@ export function starterProgram(station) {
   ];
   if (!outs.size) lines.push("", ins.size ? "// No digital outputs on the bus — inputs show in the I/O list." : "// This station has no digital I/O on the bus yet.");
   for (const [pos, list] of outs) {
-    const src = [...ins.keys()].filter((k) => k < pos).pop();
+    // the nearest input terminal before it, or its own inputs on a combi
+    // terminal (EL1859: outputs 1-8 follow inputs 1-8)
+    const src = [...ins.keys()].filter((k) => k <= pos).pop();
     const from = src !== undefined ? ins.get(src) : null;
     lines.push("", from
       ? `// I/O check: Term${pos} outputs follow Term${src} inputs`

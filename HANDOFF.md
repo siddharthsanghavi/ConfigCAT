@@ -58,7 +58,12 @@ npm run shots          # regenerate README screenshots (see below)
   `CxFace`, `RjTermFace`). 12 mm EL terminals (not HD, distribution or
   TwinSAFE) take the M7 face: `pointGeom`'s `el12` branch and `El12Face`
   share the `EL12` row constants, and the tab colours come from the pinout
-  (`el12Tab`; no pinout → grey clamp numbers). `TH` is 336.
+  (`el12Tab`; no pinout → grey clamp numbers). `TH` is 336. HD I/O
+  terminals take `Hd16Face` (the `hd16` branch, rows in `HD16.rows`).
+- Mixed terminals (`io: "mix"`, EL1859) list their channels from the
+  pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
+  terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the
+  channel (`uid:n`, the clamp number on mixed terminals).
 - `freeGeom(d)` — connection points for free-placed components, switched
   on `d.kind`.
 - `TerminalG` — rail terminals. `FreeCompG` — free components (faces

@@ -19,7 +19,7 @@
  * outside the drawing, so a station still talks EtherCAT before its field
  * wiring is done. Field power (Up) is never assumed — outputs need it wired. */
 
-import { railPointRole, freeSlaveChannels } from "./station.js";
+import { railPointRole, freeSlaveChannels, ioChannels } from "./station.js";
 
 const NO_NET = new Set(["eth", "fo", "usb", "hdmi", "dp", "dvi", "oct"]);
 
@@ -125,7 +125,7 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (role.r === "gnd") to(i, pc0);
           else if (role.r === "pe") to(i, pcpe);
           else if (role.r === "agnd") to(i, `agnd:${uid}`);
-          else if (role.ch) to(i, `ch:${uid}:${role.ch}`);
+          else if (role.n) to(i, `ch:${uid}:${role.n}`);
         }
       });
       if (d.coupler || d.cx) {
@@ -134,11 +134,11 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         powerPins[uid] = { p: `us24:${uid}`, n: `us0:${uid}`, assumed };
         if (assumed) { fixed.push({ node: `us24:${uid}`, v: "p24", ext: true }); fixed.push({ node: `us0:${uid}`, v: "gnd", ext: true }); }
       }
-      if (d.io) for (let c = 1; c <= d.ch; c++) {
-        const key = `${uid}:${c}`, node = `ch:${uid}:${c}`;
-        if (d.io === "di") diNode[key] = node;
-        else if (d.io === "do") railDo.push({ key, uid, node, group: groupOf[uid] });
-        else if (d.io === "ai") aiNode[key] = node;
+      for (const c of ioChannels(d)) {
+        const key = `${uid}:${c.n}`, node = `ch:${uid}:${c.n}`;
+        if (c.r === "di") diNode[key] = node;
+        else if (c.r === "do") railDo.push({ key, uid, node, group: groupOf[uid] });
+        else if (c.r === "ai") aiNode[key] = node;
       }
       if (d.pcBreak && !d.pcFeed) g = null;
       if (d.endcap) g = null;

@@ -7,7 +7,7 @@
  * keeps its process data at zero whatever state the master asks for. */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { buildStation } from "./station.js";
+import { buildStation, ioChannels } from "./station.js";
 import { buildCircuit, solveCircuit, readCircuit } from "./electrical.js";
 import { createPlc, starterProgram } from "./plc.js";
 
@@ -202,10 +202,10 @@ function buildView({ S, Cc, sol, rd, alive, eff, ioVal, st, p, fault, pos, doc, 
     if (d.coupler || d.cx) t.us = !!rd.powered[uid];
     if (d.cx) t.plc = fault ? "FAULT" : plcRun && p ? "RUN" : "STOP";
     if (d.io) {
-      t.ch = [];
-      for (let c = 1; c <= d.ch; c++) {
-        const k = `${uid}:${c}`;
-        t.ch.push(d.io === "di" ? !!rd.di[k] : d.io === "do" ? !!eff.get(k) : on);
+      t.ch = []; // indexed by channel key n - 1 (clamp number on mixed terminals)
+      for (const c of ioChannels(d)) {
+        const k = `${uid}:${c.n}`;
+        t.ch[c.n - 1] = c.r === "di" ? !!rd.di[k] : c.r === "do" ? !!eff.get(k) : on;
       }
     }
     term[uid] = t;

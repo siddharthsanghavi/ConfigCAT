@@ -352,6 +352,13 @@ HD, distribution or TwinSAFE) now use the new face; tab colours come from
 the pinout, so parts without one show grey clamp numbers until their pinout
 is verified. EL1002 gained its pinout from the reference.
 
+**HD status:** EL1859 pilot confirmed and ported. Every HD I/O terminal
+(not the EL918x distribution parts) uses the new face: 2 × 8 LED window,
+eight push-in rows, brand print between rows 3 and 4. EL1859 is in the
+catalog as the first mixed terminal (`io: "mix"`, channels from its pinout).
+The user confirmed the 8- and 16-point faces as the basis for the rest of
+the EL range.
+
 **The pilot settles, once for every family:**
 - Proportions: housing 336 px (was 292) plus latch hooks, about 352 px in
   all, closer to the real 12 × 100 mm terminal. `TH` and the rail stripe

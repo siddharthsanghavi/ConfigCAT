@@ -42,10 +42,25 @@ export function railPointRole(d, label) {
   if (!Number.isFinite(n)) return null;
   if (d.pinout) {
     const p = d.pinout[n - 1];
-    return p ? { r: p.r, ch: p.ch } : null;
+    return p ? { r: p.r, ch: p.ch, n: d.io === "mix" ? n : p.ch } : null;
   }
-  if (d.io && n <= d.ch) return { r: d.io, ch: n };
+  if (d.io && n <= d.ch) return { r: d.io, ch: n, n };
   return null;
+}
+
+const SIGNAL = ["di", "do", "ai", "ao"];
+/* The I/O channels of a rail terminal, in process-image order. `ch` numbers
+ * a channel within its kind (In1, Out1…); `n` keys it within the terminal
+ * (`uid:n`). They differ only on mixed terminals (io "mix", e.g. EL1859),
+ * whose channels come from the pinout and are keyed by clamp number. */
+export function ioChannels(d) {
+  if (!d.io) return [];
+  if (d.io === "mix") {
+    const out = [];
+    (d.pinout || []).forEach((p, i) => { if (p && SIGNAL.includes(p.r)) out.push({ r: p.r, ch: p.ch, n: i + 1 }); });
+    return out;
+  }
+  return Array.from({ length: d.ch }, (_, i) => ({ r: d.io, ch: i + 1, n: i + 1 }));
 }
 
 // I/O channels a free-standing EtherCAT slave exposes, by connection point
@@ -138,7 +153,7 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
       const base = c.r === "di" || c.r === "ai" ? 0x6000 : 0x7000;
       const entry = { index: base + (c.ch - 1) * 0x10, subindex: analog ? 0x11 : 1, name: ename, bitLength: analog ? 16 : 1 };
       (c.r === "di" || c.r === "ai" ? tx : rx).push(entry);
-      chans.push({ key: `${uid}:${c.ch}`, uid, ch: c.ch, r: c.r, slave: position, name: `${name}_${ename}` });
+      chans.push({ key: `${uid}:${c.n ?? c.ch}`, uid, ch: c.ch, r: c.r, slave: position, name: `${name}_${ename}` });
     }
     slaves.push({
       position, name, part: d.id, uid,
@@ -154,9 +169,7 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
         reachable.add(uid);
         const d = pos[uid]?.d;
         if (!d || d.cx || d.endcap || d.blank) continue;
-        const channels = [];
-        if (d.io) for (let c = 1; c <= d.ch; c++) channels.push({ r: d.io, ch: c });
-        addSlave(uid, d, channels);
+        addSlave(uid, d, ioChannels(d));
       }
     } else {
       const uid = u.slice(1);
