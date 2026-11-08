@@ -16,6 +16,11 @@ export function classifyPoint(d, label) {
     if (label === "⏚") return "pe";
     return null;
   }
+  if (d.coupler && d.pinout) {                                     // EK18xx
+    const q = d.pinout[Number(label) - 1];
+    if (!q) return null;
+    return q.r === "us24" || q.r === "up24" ? "p24" : q.r === "us0" || q.r === "up0" ? "gnd" : q.r;
+  }
   if (d.feed && (label === "NC" || label === "B" || label === "X")) return null; // not used / free bridge
   if (d.feed && d.efuse && label[0] === "I") return null;          // EL922x switch inputs
   if (d.feed && d.efuse && label[0] === "O") return "do";          // EL922x protected outputs

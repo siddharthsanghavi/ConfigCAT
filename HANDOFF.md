@@ -74,6 +74,11 @@ npm run shots          # regenerate README screenshots (see below)
   `S+` / `S−` the EL9550 system supply (nodes `us24` / `us0`), `I1`…`O2` the
   EL922x switch inputs and protected outputs (`d.efuse`), `X` a clamp
   without a tab. `PIN_TABS` / `PIN_LEDS` dress `pins` parts (EL9570 / 9576).
+  Couplers (not EK1914 / EK1960) take the `cplr` block: `bx` is the 12 mm
+  block's left edge (W − 53), clamps keep the FEED_GROUPS order on the EL rows
+  and the ports follow them; `d.ek18` puts 16 HD points there instead, wired
+  through `d.pinout`. `extM7` (EK1110) and `jM7` (EK1122) use the same block
+  flag with `bx` 0 / null.
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the

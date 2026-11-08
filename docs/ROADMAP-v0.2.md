@@ -389,6 +389,18 @@ EL9070 (all clamps bridged) and EL9570 / EL9576 (R clamps, +Uin / −Uin on
 the contacts) are `pins` parts with `PIN_TABS` / `PIN_LEDS`. Still on the
 old face: EL9501 (no Infosys pinout found); EL9540-0010 not added (no picture).
 
+**Couplers (board 04, confirmed):** `CouplerM7Face` draws the 44 mm housing
+with the jacks on the left and the approved EL face (`El12Face`, orange
+markers, Us / Up / Link-Act E-bus / Run LEDs from Infosys) as the block on the
+right; the EK18xx carry the HD block (`Hd16Face`) with their Infosys pinouts
+(`io: "mix"`, `ek18`, roles us24 / us0 / up24 / up0 / di / do), so their
+built-in I/O is wireable and simulated. `RjJack` is the RJ45 turned 90° as on
+the pictures (contacts right on couplers, left on EK1110 / EK1122, LEDs on
+the latch side). EK1110 is 44 mm (Infosys) on `ExtensionFace`; EK1122 /
+EK1122-0080 on `JunctionFace`. EK1914 / EK1960 keep the old coupler face
+until the TwinSAFE family; EK1121 / EK1322 / EK1521 / EK1561 / EK1310 keep
+`RjTermFace` for now. Saved EK18xx wires move (8 feed points became 16).
+
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
 (inputs yellow, outputs red, analog in green, analog out blue, from

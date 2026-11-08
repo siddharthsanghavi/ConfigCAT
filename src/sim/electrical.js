@@ -102,7 +102,16 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
       pts.forEach((p, i) => {
         if (p.port) return;
         const lb = p.label;
-        if (d.coupler) {
+        if (d.coupler && d.pinout) {
+          // EK18xx: HD block, roles from the verified pinout
+          const q = d.pinout[Number(lb) - 1];
+          if (!q) return;
+          if (q.r === "us24") to(i, `us24:${uid}`);
+          else if (q.r === "us0") to(i, `us0:${uid}`);
+          else if (q.r === "up24") to(i, pc24);
+          else if (q.r === "up0") to(i, pc0);
+          else to(i, `ch:${uid}:${Number(lb)}`);
+        } else if (d.coupler) {
           if (lb === "24V") to(i, `us24:${uid}`);
           else if (lb === "0V") to(i, `us0:${uid}`);
           else if (lb === "+") to(i, pc24);
@@ -152,7 +161,8 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         }
       });
       if (d.coupler || d.cx) {
-        const p = pts.findIndex((x) => x.label === "24V"), n = pts.findIndex((x) => x.label === "0V");
+        const pin = (r, lb) => (d.pinout ? d.pinout.findIndex((q) => q?.r === r) : pts.findIndex((x) => x.label === lb));
+        const p = pin("us24", "24V"), n = pin("us0", "0V");
         const assumed = !isWired(uid, p) && !isWired(uid, n);
         powerPins[uid] = { p: `us24:${uid}`, n: `us0:${uid}`, assumed };
         if (assumed) { fixed.push({ node: `us24:${uid}`, v: "p24", ext: true }); fixed.push({ node: `us0:${uid}`, v: "gnd", ext: true }); }
