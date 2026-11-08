@@ -115,6 +115,15 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         } else if (d.feed) {
           if (!d.pcFeed || lb === "NC") return; // EL91x0 clamps 1 / 5: not used
           if (d.ac || d.anyV) { to(i, lb === "L" ? `pcL:${g}` : lb === "N" ? `pcN:${g}` : pcpe); return; }
+          // EL95xx: 24 V in on clamps 1 / 5; the power contacts carry U0, which
+          // the 24 V solver leaves undriven. 0 V in and out share a reference
+          // unless the part is isolated (EL9560).
+          if (d.uOut && (lb === "24V" || lb === "0V")) {
+            to(i, lb === "24V" ? `us24:${uid}` : `us0:${uid}`);
+            if (lb === "0V" && !d.iso) to(i, pc0);
+            return;
+          }
+          if (d.uOut && d.uOut !== 24 && lb === "+") { to(i, `uo:${uid}`); return; }
           // EL9410 clamps 1 / 5 supply the E-bus only, not the power contacts
           if (d.ebus > 0 && (lb === "24V" || lb === "0V")) { to(i, lb === "24V" ? `us24:${uid}` : `us0:${uid}`); return; }
           if (lb === "24V" || lb === "+") to(i, pc24);

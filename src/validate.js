@@ -19,6 +19,7 @@ export function classifyPoint(d, label) {
   if (d.feed && label === "NC") return null;                       // not used
   if (d.feed && d.anyV) return label === "⏚" ? "pe" : null;         // EL9190: any voltage
   if (d.feed && d.ac) return label === "⏚" ? "pe" : "ac";
+  if (d.feed && d.uOut && d.uOut !== 24 && label === "+") return null; // U0 output, not 24 V
   if (d.coupler || d.feed) {
     if (label === "24V" || label === "+") return "p24";
     if (label === "0V" || label === "−") return "gnd";
@@ -184,6 +185,9 @@ export function validateRails(rails, byId) {
         if (!group.volt && group.consumers.length) {
           gwarn(`power contacts unpowered after ${group.src}: ${group.consumers.join(", ")} — add a potential feed terminal`);
         }
+        if (group.volt && !["24", "230", "any"].includes(group.volt) && group.dc24.length) {
+          gwarn(`power contacts after ${group.src} carry ${group.volt} V, not 24 V: ${group.dc24.join(", ")} — put an EL9100 feed in front of them`);
+        }
         if (group.volt === "230" && group.dc24.length) {
           gerr(`${group.dc24.join(", ")} sit in the 230 V AC potential group fed by ${group.src} — 24 V terminals would be destroyed; separate with EL9080 + 24 V feed`);
         }
@@ -197,7 +201,7 @@ export function validateRails(rails, byId) {
           group = { volt: "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
         } else if (d.pcFeed) {
           closeGroup();
-          group = { volt: d.ac ? "230" : d.anyV ? "any" : "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
+          group = { volt: d.ac ? "230" : d.anyV ? "any" : d.uOut ? String(d.uOut) : "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
         } else if (d.pcBreak) {
           // EL9080 separation or relay terminals whose power contacts are not looped through
           closeGroup();

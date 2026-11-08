@@ -377,7 +377,16 @@ const FEED12 = {
   EL9150: { mark: "orange", g: AC_FEED_GROUPS, leds: [null, "up"] },
   EL9160: { mark: "orange", g: AC_FEED_GROUPS, leds: [null, "up"] },
   EL9190: { mark: "orange", g: AC_FEED_GROUPS, leds: [] },
+  // EL95xx supplies (same clamps as the EL9410 layout: 1 / 5 in, 2 / 6 U0
+  // out, 3 / 7 0 V out, 4 / 8 PE); LEDs as on the pictures: two green power
+  // LEDs, the red overcurrent LED (EL9505…9515), a third green one (EL9560)
+  ...Object.fromEntries([["EL9505", "5V"], ["EL9508", "8V"], ["EL9510", "10V"], ["EL9512", "12V"], ["EL9515", "15V"]].map(([id, v]) =>
+    [id, { mark: "grey", g: FEED_GROUPS, leds: ["us", "us", "diag"], tabs: { "+": { text: v, fs: 6.4 } } }])),
+  EL9560: { mark: "grey", g: FEED_GROUPS, leds: ["us", "us", null, null, "us"], tabs: { "+": { text: "U₀", fs: 6.4 }, "−": { text: "0V", fs: 6.4 } } },
 };
+// EL9200 / EL9210 (Infosys; rows measured on the product picture): clamps
+// 1-3 left, 4-6 right, n and n + 3 linked to the same power contact
+const FUSED = { rows: [94, 188.5, 254], labels: [["+", "+"], ["−", "−"], ["⏚", "⏚"]] };
 const feedGroupsFor = (d) => FEED12[d.id]?.g || (d.ac ? AC_FEED_GROUPS : FEED_GROUPS);
 
 // ---- clamp point geometry (must mirror rendering) ------------------
@@ -391,6 +400,7 @@ function pointGeom(d) {
   const W = Math.round(d.w * PX_PER_MM);
   const pts = [];
   if (d.endcap) return { W, pts, block: { cap: true } };
+  if (d.sep) return { W, pts, block: { sep: true } };
   if (d.blank || (d.fn === "saf" && !d.io && !d.feed)) return { W, pts };
   if (d.ext || d.junction || d.rj) {
     // network ports only — appended as wireable points (match RjTermFace)
@@ -435,6 +445,13 @@ function pointGeom(d) {
     [["+", "+"], ["\u2212", "\u2212"]].forEach((pair, r) => pair.forEach((lb, ci) =>
       pts.push({ x: oc[ci], y: 196 + r * 42, label: lb, size: 8.5, col: ci })));
     return { W, pts };
+  }
+  if (d.fused) {
+    // EL9200 / EL9210: fuse holder on top, three rows (must mirror FusedFace)
+    const c12 = [W * 0.32, W * 0.68];
+    FUSED.labels.forEach((pair, row) => pair.forEach((lb, col) =>
+      pts.push({ x: c12[col], y: FUSED.rows[row] + EL12.entry, label: lb, size: 6.2, col, round: true })));
+    return { W, pts, block: { cols: c12, el12: true, fused: true } };
   }
   if (d.feed && FEED12[d.id]) {
     // EL9 feeds on the 12 mm face (must mirror El12Face): point i sits in
@@ -791,6 +808,13 @@ function pointRole(d, p) {
   if (d.feed && (d.ac || d.anyV)) {
     if (lb === "L") return d.anyV ? "L \u2014 feed up to 230 V AC/DC to power contacts" : "L \u2014 120\u2026230 V AC feed to power contacts";
     if (lb === "N") return "N \u2014 neutral to power contacts";
+    return "PE \u2014 earth power contact";
+  }
+  if (d.feed && d.uOut) {
+    if (lb === "24V") return "+24 V input";
+    if (lb === "0V") return "0 V input";
+    if (lb === "+") return `U0 output ${d.uOut} V DC (to the power contact)`;
+    if (lb === "\u2212") return d.iso ? "0 V output (isolated)" : "0 V output";
     return "PE \u2014 earth power contact";
   }
   if (d.feed && d.ebus > 0 && lb === "24V") return "+24 V for the E-bus supply (Us)";
@@ -2398,7 +2422,7 @@ function segBackplane(seg, fsoeActive) {
     if (d.psu) continue;
     if (d.blank) { if (g) g.r = Math.max(g.r ?? L, R); continue; }
     if (d.coupler || d.cx) { push(); g = { x0: L, volt: "24", src: d.id, r: R }; continue; }
-    if (d.pcFeed) { push(); g = { x0: L, volt: d.ac ? "230" : d.anyV ? "any" : "24", src: d.id, r: R }; continue; }
+    if (d.pcFeed) { push(); g = { x0: L, volt: d.ac ? "230" : d.anyV ? "any" : d.uOut ? String(d.uOut) : "24", src: d.id, r: R }; continue; }
     if (d.pcBreak) { push(); g = { x0: L, volt: null, src: d.id, r: R }; continue; }
     if (g) g.r = R;
   }
@@ -2424,8 +2448,8 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   for (const x of its) { cur.push(x); if (x.d.endcap) { segments.push(cur); cur = []; } }
   if (cur.length) segments.push(cur);
 
-  const pcColor = (v) => (v === "230" ? "#E8781E" : v === "24" ? "#2E9E5B" : v === "any" ? "#8A7A2E" : "#9AA0A6");
-  const pcText = (v) => (v === "230" ? "230 V" : v === "24" ? "24 V" : v === "any" ? "≤ 230 V AC/DC" : "no feed");
+  const pcColor = (v) => (v === "230" ? "#E8781E" : v === "24" ? "#2E9E5B" : v === "any" ? "#8A7A2E" : v ? "#5B7FA6" : "#9AA0A6");
+  const pcText = (v) => (v === "230" ? "230 V" : v === "24" ? "24 V" : v === "any" ? "≤ 230 V AC/DC" : v ? `${v} V` : "no feed");
 
   return (
     <g pointerEvents="none">
@@ -2470,7 +2494,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
   const hd16 = !!geom.block?.hd16, ed = !!geom.block?.ed;
   const cap = !!geom.block?.cap; // EL9011 / EL9012 end cover
-  const el12 = !!geom.block?.el12 || hd16 || ed || cap; // the M7 12 mm housing
+  const sep = !!geom.block?.sep; // EL9080 separation terminal
+  const el12 = !!geom.block?.el12 || hd16 || ed || cap || sep; // the M7 12 mm housing
 
   return (
     <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
@@ -2513,6 +2538,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
         d.cx ? <CxFace d={d} W={W} sim={sim} /> :
         cap ? <EndCoverFace d={d} W={W} /> :
+        sep ? <SeparationFace d={d} W={W} /> :
         d.endcap || d.blank ? <PlainFace d={d} W={W} /> :
         d.ext || d.junction || d.rj ? <RjTermFace d={d} W={W} sim={sim} /> :
         <ElFace d={d} W={W} uid={uid} geom={geom} wiredPts={wiredPts} powered={powered} sim={sim} />}
@@ -2566,8 +2592,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
           {!ed && [0, 1, 2, 3, 4, 5].map((i) => (
             <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
           ))}
-          <rect x={W - 2} y={hd16 || ed ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill={ed ? "#EE7A3C" : "#F0961C"} stroke={ed ? "#B9561F" : "#BF730E"} strokeWidth="0.5" />
-          {(ed ? [168, 232] : hd16 ? [179, 241] : d.noPE ? [179, 246] : [179, 246, 310]).map((y) => (
+          {!sep && <rect x={W - 2} y={hd16 || ed ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill={ed ? "#EE7A3C" : "#F0961C"} stroke={ed ? "#B9561F" : "#BF730E"} strokeWidth="0.5" />}
+          {(sep ? [] : ed ? [168, 232] : hd16 ? [179, 241] : d.noPE ? [179, 246] : [179, 246, 310]).map((y) => (
             <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
           ))}
         </g>
@@ -2625,7 +2651,10 @@ const FEED_TAB = {
 };
 const DIST_TAB = { p24: "+", up: "+", gnd: "−", un: "−", pe: "⏚" };
 function el12Tab(d, n) {
-  if (FEED12[d.id]) return FEED_TAB[feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
+  if (FEED12[d.id]) {
+    const lb = feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0];
+    return { ...FEED_TAB[lb], ...FEED12[d.id].tabs?.[lb] };
+  }
   if (d.pins) {
     // EL9186 / EL9187 carry olive marker tabs numbered across the rows
     // (01 02 / 03 04 …), the others show their potential
@@ -2853,6 +2882,10 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   else if (d.fn === "mot" || d.fn === "pos") ledStates.push(powered, false, false, false);
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
 
+  if (b.fused) {
+    const fed = geom.pts.some((p, i) => p.label === "+" && wiredPts.has(`${uid}:${i}`));
+    return <FusedFace d={d} W={W} cols={cols} power={sim ? !!sim.up : powered && fed} />;
+  }
   if (b.feed12) {
     // us: E-bus supply (clamp 1 / 5), up: power-contact feed (+ or L), run:
     // E-bus alive. Off-sim a supply LED lights once its clamp is wired; the
@@ -3050,6 +3083,61 @@ function RjTermFace({ d, W, sim = null }) {
           <Rj45 key={i} cx={W / 2} y={78 + i * pitch} tag={n > 1 ? `X${i + 1}` : d.ext ? "OUT" : "X1"} />
         ))
       )}
+    </g>
+  );
+}
+
+// EL9080: the orange front that marks the break in the power contacts
+// (E-bus passes through); grey recesses as on the product picture
+function SeparationFace({ d, W }) {
+  return (
+    <g>
+      <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill="#C96E14" stroke="#94500B" strokeWidth="0.5" />
+      <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill="#C96E14" stroke="#94500B" strokeWidth="0.5" />
+      <rect x="3" y="23" width={W - 6} height="282" rx="1" fill="#CA8200" stroke="#9C6400" strokeWidth="0.5" />
+      {[W * 0.32, W * 0.68].map((cx) => <rect key={cx} x={cx - 5} y="206" width="10" height="16" rx="1.5" fill="#8C5A00" opacity="0.55" />)}
+      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>
+    </g>
+  );
+}
+
+// EL9200 / EL9210: orange markers, Error (red, left) and Power (green,
+// right) LEDs, the fuse holder, three clamp rows at FUSED.rows
+function FusedFace({ d, W, cols, power }) {
+  return (
+    <g>
+      <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill="#C96E14" stroke="#94500B" strokeWidth="0.5" />
+      <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill="#C96E14" stroke="#94500B" strokeWidth="0.5" />
+      {cols.map((cx, i) => {
+        const on = i === 1 && power;
+        return (
+          <g key={i}>
+            <circle cx={cx} cy="37" r="6.4" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+            <circle cx={cx} cy="37" r="4.8" fill="#4A4E52" />
+            {on && <circle cx={cx} cy="37" r="4.8" fill="#46E36E" />}
+            {on && <circle cx={cx} cy="37" r="4.8" fill="#46E36E" opacity="0.55" filter="blur(2px)" />}
+          </g>
+        );
+      })}
+      <rect x="4" y="57" width={W - 8} height="33" rx="2" fill="#EE9E0C" stroke="#B87708" strokeWidth="0.6" />
+      <rect x={W / 2 - 11.5} y="64" width="23" height="8" rx="1" fill="none" stroke="#2A2010" strokeWidth="0.8" />
+      <line x1={W / 2 - 15.5} y1="68" x2={W / 2 + 15.5} y2="68" stroke="#2A2010" strokeWidth="0.8" />
+      <text x={W / 2} y="84" fill="#2A2010" fontSize="5.6" fontWeight="700" fontFamily="system-ui" textAnchor="middle">250V/6,3A</text>
+      {FUSED.rows.map((g, row) => cols.map((cx, ci) => {
+        const n = ci * 3 + row + 1, t = FEED_TAB[FUSED.labels[row][ci]];
+        return (
+          <g key={n}>
+            <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />
+            <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>
+            <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
+            <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
+            <text x={cx - 8.2} y={g + 33.6} fill="#51565B" fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
+          </g>
+        );
+      }))}
+      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>
     </g>
   );
 }

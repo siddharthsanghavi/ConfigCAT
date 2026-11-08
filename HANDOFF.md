@@ -67,6 +67,9 @@ npm run shots          # regenerate README screenshots (see below)
   `run`, `diag`). Feed labels `NC` are not connected anywhere.
   Distribution terminals carry `pins` (one role per clamp); `railPointRole`
   maps them, and a `b<k>` bridge becomes the node `br:<uid>:b<k>`.
+  `d.fused` (EL9200 / EL9210) → `FusedFace`; `d.sep` (EL9080) →
+  `SeparationFace`; `d.uOut` (EL95xx) → a supply: 24 V in on clamps 1 / 5,
+  U0 on the + clamps and power contacts (node `uo:<uid>` below 24 V).
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the

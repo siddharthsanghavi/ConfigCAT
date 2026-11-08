@@ -375,8 +375,14 @@ terminal, up / un on the any-voltage EL9185-0010), grey markers, an empty
 LED window (12 mm) or plain panel (HD), EL9186 / EL9187 with the olive
 01–08 tabs of the real parts and no PE contact. EL9184 now knows its
 potentials. New: EL9180, EL9181, EL9182, EL9183, EL9185, EL9185-0010.
-Still on the old face: EL9080, EL92xx fused feeds (6 clamps), EL95xx
-supplies.
+Board 03c (confirmed) followed: EL9200 / EL9210 on their own fused face
+(`FusedFace`, six clamps at `FUSED.rows`), EL9505…9515 and EL9560 on the
+12 mm face via `FEED12` (voltage on the U0 tabs; `uOut` marks a supply whose
+power contacts carry U0, which the 24 V solver leaves undriven and
+validation flags for 24 V parts after it), EL9080 on `SeparationFace`.
+Still on the old face: EL9501 (no Infosys pinout found) and the special
+terminals (shield, surge filter, buffer capacitor, brake chopper,
+electronic fuses).
 
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type

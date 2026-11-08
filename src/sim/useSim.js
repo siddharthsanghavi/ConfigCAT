@@ -201,7 +201,7 @@ function buildView({ S, Cc, sol, rd, alive, eff, ioVal, st, p, fault, pos, doc, 
     const t = { alive: on, up, run: on ? runLed : false };
     if (d.coupler || d.cx) t.us = !!rd.powered[uid];
     // EL9410: E-bus supply on clamps 1 / 5
-    if (d.feed && d.ebus > 0) t.us = sol.level(`us24:${uid}`) === "p24" && sol.level(`us0:${uid}`) === "gnd";
+    if (d.feed && (d.ebus > 0 || d.uOut)) t.us = sol.level(`us24:${uid}`) === "p24" && sol.level(`us0:${uid}`) === "gnd";
     // AC / any-voltage feeds: Power LED follows the voltage on the L contact
     if (d.feed && (d.ac || d.anyV)) { const g = Cc.groupOf[uid], l = g == null ? null : sol.level(`pcL:${g}`); t.up = l === "L" || l === "p24"; }
     if (d.cx) t.plc = fault ? "FAULT" : plcRun && p ? "RUN" : "STOP";
