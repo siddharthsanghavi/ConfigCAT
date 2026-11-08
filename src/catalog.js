@@ -88,7 +88,8 @@ export const CATALOG = [
   { id: "EL9576", name: "Brake Chopper",               fn: "sys", io: null, ch: 0, w: 12, ebus: 0, blank: true, desc: "Brake chopper terminal — absorbs regenerated drive energy" },
   { id: "EL9930", name: "PROFIsafe Segment End",       fn: "sys", io: null, ch: 0, w: 12, ebus: 0, blank: true, desc: "PROFIsafe segment end terminal" },
   // --- Digital Input ---
-  { id: "EL1002", name: "2-Ch DI 24V 3ms",   fn: "di", io: "di", ch: 2,  w: 12, ebus: -90 },
+  { id: "EL1002", name: "2-Ch DI 24V 3ms",   fn: "di", io: "di", ch: 2,  w: 12, ebus: -90,
+    pinout: [{ r: "di", ch: 1 }, { r: "p24" }, { r: "gnd" }, { r: "pe" }, { r: "di", ch: 2 }, { r: "p24" }, { r: "gnd" }, { r: "pe" }] },
   { id: "EL1004", name: "4-Ch DI 24V 3ms",   fn: "di", io: "di", ch: 4,  w: 12, ebus: -90,
     pinout: [{ r: "di", ch: 1 }, { r: "p24" }, { r: "p24" }, { r: "di", ch: 3 }, { r: "di", ch: 2 }, { r: "p24" }, { r: "p24" }, { r: "di", ch: 4 }] },
   { id: "EL1008", name: "8-Ch DI 24V 3ms",   fn: "di", io: "di", ch: 8,  w: 12, ebus: -90,

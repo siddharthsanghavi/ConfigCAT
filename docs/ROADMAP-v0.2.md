@@ -347,15 +347,23 @@ pinout → the user confirms or marks it up → port it to the app (face
 renderer and `pointGeom` together, so wires still land) → check an app
 screenshot against the reference.
 
+**Status:** EL1002 pilot confirmed and ported. All 12 mm EL terminals (not
+HD, distribution or TwinSAFE) now use the new face; tab colours come from
+the pinout, so parts without one show grey clamp numbers until their pinout
+is verified. EL1002 gained its pinout from the reference.
+
 **The pilot settles, once for every family:**
-- Proportions: about 352 px tall (was 292), closer to the real 12 × 100 mm
-  housing. `TH` and every Y offset derived from it move with it.
+- Proportions: housing 336 px (was 292) plus latch hooks, about 352 px in
+  all, closer to the real 12 × 100 mm terminal. `TH` and the rail stripe
+  move with it; other faces stretch with `TH` until their family is redrawn.
 - Colour-coded tabs from the pinout: red `+`, blue `−`, green-yellow `⏚`,
   and signal-type labels (I1/I2…) instead of grey 1–8 tabs.
 - A 4×2 LED window, a release button over a round wire entry for each
   clamp, small clamp numbers, a horizontal `EL1002 / BECKHOFF` print, and
   latch hooks top and bottom.
-- Data: every terminal needs a verified pinout (only 8 have one today).
+- Data: every terminal needs a verified pinout (9 have one today).
+- Still open: tab colours for outputs and analog parts (yellow for now,
+  as on the DI reference) and what the top marker labels show (blank).
 
 **Families, in order (319 Beckhoff parts):**
 

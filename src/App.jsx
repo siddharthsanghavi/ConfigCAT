@@ -322,10 +322,16 @@ function download(name, content, type) {
   URL.revokeObjectURL(url);
 }
 const PX_PER_MM = 4.4;
-const TH = 292;
+// rail-device housing height. 336 px plus the 12 mm EL face's latch hooks
+// (8 px above and below) is about the real terminal's 12 × 100 mm outline.
+const TH = 336;
+// 12 mm EL face (M7, EL1002 pilot): four clamp rows, each a colour tab, a
+// release button and a round wire entry `entry` px below the row top.
+const EL12 = { gTop: 68, gh: 62.5, entry: 42 };
 const RAIL_PAD_X = 26;
 const RAIL_GAP = 130;
 const RAIL_TOP = 44; // room for ID badges
+const RAIL_Y = Math.round(TH * 0.74); // DIN rail stripe, from the housing top
 
 const FEED_GROUPS = [
   { labels: ["24V", "0V"], colors: ["red", "blue"] },
@@ -415,7 +421,16 @@ function pointGeom(d) {
     }
     return { W, pts, block: { cols, top, bot, rows, hd } };
   }
-  // 8-point terminals share the coupler block's group spacing
+  // 12 mm EL terminals: the redrawn face (must mirror El12Face)
+  if (!d.dist && !d.safety && d.w === 12) {
+    const c12 = [W * 0.32, W * 0.68];
+    for (let p = 0; p < 8; p++) {
+      const col = p < 4 ? 0 : 1, row = p % 4;
+      pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true });
+    }
+    return { W, pts, block: { cols: c12, gTop: EL12.gTop, gh: EL12.gh, el12: true } };
+  }
+  // other 8-point terminals share the coupler block's group spacing
   const gTop = 64, gh = (TH - 24 - gTop) / 4;
   for (let p = 0; p < 8; p++) {
     const col = p < 4 ? 0 : 1, row = p % 4;
@@ -1664,11 +1679,11 @@ export default function BeckhoffConfigurator() {
                     <text x={layout.canvasW - RAIL_PAD_X} y={y - 26} fill={C.brand} fontSize="10.5" textAnchor="end"
                       style={{ cursor: "pointer" }} onClick={() => removeRail(ri)}>remove rail ✕</text>
                   )}
-                  <rect x="8" y={y + 216} width={layout.canvasW - 16} height="28" fill="url(#railg)" />
-                  <rect x="8" y={y + 216} width={layout.canvasW - 16} height="1.6" fill="#FAFBFC" />
-                  <rect x="8" y={y + 242} width={layout.canvasW - 16} height="2" fill="#767C82" />
+                  <rect x="8" y={y + RAIL_Y} width={layout.canvasW - 16} height="28" fill="url(#railg)" />
+                  <rect x="8" y={y + RAIL_Y} width={layout.canvasW - 16} height="1.6" fill="#FAFBFC" />
+                  <rect x="8" y={y + RAIL_Y + 26} width={layout.canvasW - 16} height="2" fill="#767C82" />
                   {Array.from({ length: Math.floor((layout.canvasW - 30) / 26) }).map((_, i) => (
-                    <rect key={i} x={18 + i * 26} y={y + 225} width="12" height="10" rx="2.5" fill="#878D93" stroke="#6E747A" strokeWidth="0.6" />
+                    <rect key={i} x={18 + i * 26} y={y + RAIL_Y + 9} width="12" height="10" rx="2.5" fill="#878D93" stroke="#6E747A" strokeWidth="0.6" />
                   ))}
                   {rail.items.length === 0 && (
                     <text x={layout.canvasW / 2} y={y + 140} fill={C.muted} fontSize="12" textAnchor="middle">
@@ -2380,6 +2395,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const W = geom.W;
   const uid = inst.uid;
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
+  const el12 = !!geom.block?.el12;
 
   return (
     <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
@@ -2403,12 +2419,20 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         </g>
       )}
 
+      {/* latch hooks above and below the 12 mm EL housing */}
+      {el12 && [-7.5, TH - 1.5].map((y) => (
+        <g key={y}>
+          <rect x="3" y={y} width={W - 6} height="9" rx="1" fill="#F3F4F5" stroke="#A9ADB1" strokeWidth="0.5" />
+          <rect x="9" y={y + 2.7} width={W - 18} height="3.6" rx="0.6" fill="#C5C9CC" />
+        </g>
+      ))}
+
       {/* housing */}
-      <rect x="0.5" y="1.5" width={W - 1} height={TH - 3} rx="3" fill={body} stroke={selected ? C.ink : M.hEdge} strokeWidth={selected ? 1.6 : 0.9} />
+      <rect x="0.5" y={el12 ? 0 : 1.5} width={W - 1} height={el12 ? TH : TH - 3} rx={el12 ? 1.5 : 3} fill={body} stroke={selected ? C.ink : el12 ? "#A3A7AB" : M.hEdge} strokeWidth={selected ? 1.6 : el12 ? 0.6 : 0.9} />
       <rect x="2" y="3" width="1" height={TH - 8} fill={M.hi} />
-      <rect x={W - 3} y="3" width="1" height={TH - 8} fill={M.groove} />
+      {!el12 && <rect x={W - 3} y="3" width="1" height={TH - 8} fill={M.groove} />}
       {/* silver rail-latch nub near rail line */}
-      <rect x="-1.2" y={190} width="3" height="12" rx="1.2" fill="#C9CDD2" stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />
+      {!el12 && <rect x="-1.2" y={190} width="3" height="12" rx="1.2" fill="#C9CDD2" stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />}
 
       {d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
         d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
@@ -2439,6 +2463,16 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
             </g>
           );
         }
+        if (p.round) {
+          return (
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+              <RoundClamp x={p.x} y={p.y} hl={isPending} />
+              <rect x={p.x - 9.5} y={p.y - 27} width="19" height="36" fill="transparent">
+                <title>{pointRole(d, p)}</title>
+              </rect>
+            </g>
+          );
+        }
         return (
           <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
             <ClampUnit x={p.x} y={p.y} size={p.size} hl={isPending} />
@@ -2449,12 +2483,25 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         );
       })}
 
+      {/* 12 mm EL sides: E-bus springs and the orange release tab on the
+          right, the three power contacts (+24 V, 0 V, PE) on the left */}
+      {el12 && (
+        <g>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <rect key={i} x={W - 1.4} y={29 + i * 14} width="2.6" height="6" rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
+          ))}
+          <rect x={W - 2} y="208" width="4.2" height="30" rx="1.6" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
+          {[179, 246, 310].map((y) => (
+            <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
+          ))}
+        </g>
+      )}
       {/* gold power contact blades on right edge */}
-      {!d.endcap && !d.blank && !d.psu && [0, 1, 2].map((i) => (
+      {!el12 && !d.endcap && !d.blank && !d.psu && [0, 1, 2].map((i) => (
         <rect key={i} x={W - 1.8} y={168 + i * 26} width="3.2" height="15" rx="1" fill={M.gold} stroke={M.goldDk} strokeWidth="0.5" />
       ))}
       {/* orange release latch on right edge */}
-      {!d.endcap && !d.blank && !d.psu && (
+      {!el12 && !d.endcap && !d.blank && !d.psu && (
         <rect x={W - 2.4} y={128} width="4.8" height="22" rx="2" fill={M.org} stroke={M.orgDk} strokeWidth="0.6" />
       )}
     </g>
@@ -2473,6 +2520,96 @@ const ledChannel = (slot, d) => {
   return p?.ch ? p.ch - 1 : idx;
 };
 
+// clamp point index (0-based) that carries channel c (0-based)
+const SIGNAL_ROLES = ["di", "do", "ai", "ao"];
+const channelPoint = (d, c) => {
+  if (!d.pinout) return c;
+  const i = d.pinout.findIndex((p) => p.ch === c + 1 && SIGNAL_ROLES.includes(p.r));
+  return i < 0 ? c : i;
+};
+
+// colour tab over a 12 mm EL clamp, from the verified pinout. Without one
+// the tab only shows the clamp number, so nothing unverified is claimed.
+const EL12_TAB = {
+  sig: { fill: "#DCD13B", edge: "#A39A22", ink: "#2A2A22" },
+  p24: { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF" },
+  gnd: { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF" },
+  pe:  { fill: "#BCA957", edge: "#8A7C3B", ink: "#3A3420" },
+  none: { fill: "#C9CBCE", edge: "#9A9EA2", ink: "#3A3F44" },
+};
+function el12Tab(d, n) {
+  const p = d.pinout?.[n - 1];
+  const sig = { di: "I", do: "O", ai: "AI", ao: "AO" };
+  if (p && sig[p.r]) return { ...EL12_TAB.sig, text: `${sig[p.r]}${p.ch ?? ""}`, fs: p.r.length > 1 && p.r[0] === "a" ? 6 : 7 };
+  if (p?.r === "p24") return { ...EL12_TAB.p24, text: "+", fs: 9 };
+  if (p?.r === "gnd") return { ...EL12_TAB.gnd, text: "−", fs: 9 };
+  if (p?.r === "agnd") return { ...EL12_TAB.gnd, text: "GND", fs: 5.6 };
+  if (p?.r === "pe") return { ...EL12_TAB.pe, text: "⏚", fs: 8 };
+  return { ...EL12_TAB.none, text: String(n), fs: 6.4 };
+}
+
+// round wire entry of a 12 mm EL clamp (the clickable wiring point)
+function RoundClamp({ x, y, hl }) {
+  return (
+    <g>
+      {hl && <rect x={x - 9.5} y={y - 27} width="19" height="36" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
+      <circle cx={x} cy={y} r="6.2" fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
+      <circle cx={x} cy={y} r="4.4" fill="#2E3134" />
+    </g>
+  );
+}
+
+// 12 mm EL terminal face (M7, confirmed on the EL1002 pilot). Geometry
+// mirrors pointGeom's el12 branch: rows at EL12.gTop + row·gh, each a tab,
+// a release button and the wire entry (drawn by TerminalG).
+function El12Face({ d, W, cols, states }) {
+  const led = (on, x, y, key) => {
+    const col = on === "red" ? "#FF3B30" : "#46E36E";
+    return (
+      <g key={key}>
+        <rect x={x} y={y} width="14" height="5" rx="0.8" fill="#4A4E52" />
+        {on && (
+          <g>
+            <rect x={x} y={y} width="14" height="5" rx="0.8" fill={col} />
+            <rect x={x} y={y} width="14" height="5" rx="0.8" fill={col} opacity="0.55" filter="blur(2px)" />
+            {(on === "blink" || on === "flash") && (
+              <animate attributeName="opacity" values={on === "blink" ? "1;1;0;0" : "1;0;0;0;0"} dur={on === "blink" ? "0.4s" : "1.2s"} calcMode="discrete" repeatCount="indefinite" />
+            )}
+          </g>
+        )}
+      </g>
+    );
+  };
+  const beckhoff = !d.brand || d.brand === "beckhoff";
+  return (
+    <g>
+      {/* marker labels */}
+      <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      {/* LED window: 4 rows × 2, slot s at row ⌊s/2⌋, column s mod 2 */}
+      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
+      {Array.from({ length: 8 }).map((_, s) => led(states[s] || false, cols[s % 2] - 7, 27.5 + Math.floor(s / 2) * 8.5, s))}
+      {/* clamp rows */}
+      {[0, 1].map((ci) => [0, 1, 2, 3].map((row) => {
+        const n = ci * 4 + row + 1, g = EL12.gTop + row * EL12.gh, cx = cols[ci], t = el12Tab(d, n);
+        return (
+          <g key={n}>
+            <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />
+            <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>
+            <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
+            <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
+            <text x={cx - 8.2} y={g + 33.6} fill="#51565B" fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
+          </g>
+        );
+      }))}
+      {/* part print */}
+      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      {beckhoff && <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>}
+    </g>
+  );
+}
+
 function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   const b = geom.block || {};
   const cols = b.cols || [W * 0.30, W * 0.70];
@@ -2486,10 +2623,12 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
     else if (d.feed) ledStates.push(!!sim.up, !!sim.up);
     else if (d.fn === "mot" || d.fn === "pos") ledStates.push(sim.run || false, false, false, false);
     else if (d.fn === "saf" && !d.io) ledStates.push(sim.run || false, false);
-  } else if (d.io) for (let c = 0; c < d.ch; c++) ledStates.push(powered && wiredPts.has(`${uid}:${c}`));
+  } else if (d.io) for (let c = 0; c < d.ch; c++) ledStates.push(powered && wiredPts.has(`${uid}:${channelPoint(d, c)}`));
   else if (d.feed) ledStates.push(powered, powered); // Us / Up
   else if (d.fn === "mot" || d.fn === "pos") ledStates.push(powered, false, false, false);
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
+
+  if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
 
   return (
     <g>

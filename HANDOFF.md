@@ -54,8 +54,11 @@ npm run shots          # regenerate README screenshots (see below)
 ### App.jsx landmarks
 - `C`, `M`, `FN`, `BRANDS`, `WIRES`, `ROLE_COLOR` — constants near the top.
 - `pointGeom(d)` — rail-terminal clamp points. **Must stay in lockstep
-  with the face renderers** (`ElFace`, `CouplerFace`, `PsuFace`, `CxFace`,
-  `RjTermFace`).
+  with the face renderers** (`ElFace`, `El12Face`, `CouplerFace`, `PsuFace`,
+  `CxFace`, `RjTermFace`). 12 mm EL terminals (not HD, distribution or
+  TwinSAFE) take the M7 face: `pointGeom`'s `el12` branch and `El12Face`
+  share the `EL12` row constants, and the tab colours come from the pinout
+  (`el12Tab`; no pinout → grey clamp numbers). `TH` is 336.
 - `freeGeom(d)` — connection points for free-placed components, switched
   on `d.kind`.
 - `TerminalG` — rail terminals. `FreeCompG` — free components (faces
