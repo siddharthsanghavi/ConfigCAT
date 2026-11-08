@@ -113,8 +113,10 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (lb === "0V") { to(i, `us0:${uid}`); to(i, pc0); }
           else to(i, pcpe);
         } else if (d.feed) {
-          if (!d.pcFeed) return;
-          if (d.ac) { to(i, lb === "L" ? `pcL:${g}` : lb === "N" ? `pcN:${g}` : pcpe); return; }
+          if (!d.pcFeed || lb === "NC") return; // EL91x0 clamps 1 / 5: not used
+          if (d.ac || d.anyV) { to(i, lb === "L" ? `pcL:${g}` : lb === "N" ? `pcN:${g}` : pcpe); return; }
+          // EL9410 clamps 1 / 5 supply the E-bus only, not the power contacts
+          if (d.ebus > 0 && (lb === "24V" || lb === "0V")) { to(i, lb === "24V" ? `us24:${uid}` : `us0:${uid}`); return; }
           if (lb === "24V" || lb === "+") to(i, pc24);
           else if (lb === "0V" || lb === "−") to(i, pc0);
           else to(i, pcpe);

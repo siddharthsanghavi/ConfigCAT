@@ -361,6 +361,17 @@ the EL range. EL marker labels now follow the same signal-type colours
 (checked against the product finder pictures: EL1008 yellow, EL2008 red,
 EL3004 green, EL4004 blue; `elMark(d)`), clamp tabs unchanged.
 
+**EL9 feeds and end covers:** ported on the 12 mm face (`FEED12` table,
+`feed12` branch): EL9410, EL9100 / EL9110, EL9150 / EL9160 / EL9190, and
+the EL9011 / EL9012 end covers (`EndCoverFace`). Pinouts and LEDs from
+Infosys; marker colours and LED positions checked against the product
+finder pictures (grey markers on the EL9410, orange on the EL91x0 feeds,
+one Power LED top right). Fixes: EL91x0 clamps 1 / 5 are "not used" (they
+were 24V / 0V tied to the power contacts), the EL9150 point layout was a
+guess (now L on 2 / 6, N on 3 / 7), and the EL9410's clamps 1 / 5 feed the
+E-bus only. Still on the old face: EL918x distribution, EL9080, EL92xx fused
+feeds (6 clamps), EL95xx supplies.
+
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
 (inputs yellow, outputs red, analog in green, analog out blue, from

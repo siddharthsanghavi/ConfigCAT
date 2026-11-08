@@ -16,6 +16,8 @@ export function classifyPoint(d, label) {
     if (label === "⏚") return "pe";
     return null;
   }
+  if (d.feed && label === "NC") return null;                       // not used
+  if (d.feed && d.anyV) return label === "⏚" ? "pe" : null;         // EL9190: any voltage
   if (d.feed && d.ac) return label === "⏚" ? "pe" : "ac";
   if (d.coupler || d.feed) {
     if (label === "24V" || label === "+") return "p24";
@@ -191,7 +193,7 @@ export function validateRails(rails, byId) {
           group = { volt: "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
         } else if (d.pcFeed) {
           closeGroup();
-          group = { volt: d.ac ? "230" : "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
+          group = { volt: d.ac ? "230" : d.anyV ? "any" : "24", src: d.id, loadA: 0, consumers: [], dc24: [] };
         } else if (d.pcBreak) {
           // EL9080 separation or relay terminals whose power contacts are not looped through
           closeGroup();

@@ -61,6 +61,10 @@ npm run shots          # regenerate README screenshots (see below)
   (`el12Tab`; no pinout → grey clamp numbers). `TH` is 336. HD I/O
   terminals take `Hd16Face` (the `hd16` branch, rows in `HD16.rows`).
   Marker label colours come from `elMark(d)` (EL) or `ED_MARK` (ED).
+  EL9 feeds listed in `FEED12` take the `feed12` branch: points follow
+  `feedGroupsFor(d)` (row = clamp pair n / n+4), tabs come from `FEED_TAB`,
+  LEDs from `FEED12[id].leds` (`us` E-bus supply, `up` power-contact feed,
+  `run`, `diag`). Feed labels `NC` are not connected anywhere.
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the

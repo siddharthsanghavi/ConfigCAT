@@ -350,14 +350,35 @@ const FEED_GROUPS = [
   { labels: ["−", "−"],    colors: ["blue", "blue"] },
   { labels: ["⏚", "⏚"],   colors: ["kh", "kh"] },
 ];
-// 120…230 V AC feed terminals (EL9150) — approximate point layout
-const AC_FEED_GROUPS = [
-  { labels: ["L", "N"], colors: ["gy", "gy"] },
-  { labels: ["L", "N"], colors: ["gy", "gy"] },
-  { labels: ["⏚", "⏚"], colors: ["kh", "kh"] },
-  { labels: ["⏚", "⏚"], colors: ["kh", "kh"] },
+// EL9 potential feeds (Infosys pinouts, checked against the product finder
+// pictures): clamps 1 / 5 are "not used", 2 / 6 feed the + (or L) power
+// contact, 3 / 7 the − (or N) one, 4 / 8 PE. Rows hold clamps n and n + 4.
+const PC_FEED_GROUPS = [
+  { labels: ["NC", "NC"], colors: ["gy", "gy"] },
+  { labels: ["+", "+"],    colors: ["red", "red"] },
+  { labels: ["−", "−"],    colors: ["blue", "blue"] },
+  { labels: ["⏚", "⏚"],   colors: ["kh", "kh"] },
 ];
-const feedGroupsFor = (d) => (d.ac ? AC_FEED_GROUPS : FEED_GROUPS);
+// 120…230 V AC (EL9150 / EL9160) and any-voltage (EL9190) feeds
+const AC_FEED_GROUPS = [
+  { labels: ["NC", "NC"], colors: ["gy", "gy"] },
+  { labels: ["L", "L"],   colors: ["gy", "gy"] },
+  { labels: ["N", "N"],   colors: ["gy", "gy"] },
+  { labels: ["⏚", "⏚"],  colors: ["kh", "kh"] },
+];
+// Feed terminals drawn on the 12 mm M7 face: marker colour and LED slots
+// (slot 0 top-left, 1 top-right, …) from Beckhoff's pictures and Infosys.
+// EL9410: Power (E-bus), Power, Diag Us, Diag Up, RUN; the EL91x0 parts have
+// one Power LED top right; the EL9190 has none.
+const FEED12 = {
+  EL9410: { mark: "grey", g: FEED_GROUPS, leds: ["us", "up", "diag", "diag", "run"] },
+  EL9100: { mark: "orange", g: PC_FEED_GROUPS, leds: [null, "up"] },
+  EL9110: { mark: "orange", g: PC_FEED_GROUPS, leds: [null, "up"] },
+  EL9150: { mark: "orange", g: AC_FEED_GROUPS, leds: [null, "up"] },
+  EL9160: { mark: "orange", g: AC_FEED_GROUPS, leds: [null, "up"] },
+  EL9190: { mark: "orange", g: AC_FEED_GROUPS, leds: [] },
+};
+const feedGroupsFor = (d) => FEED12[d.id]?.g || (d.ac ? AC_FEED_GROUPS : FEED_GROUPS);
 
 // ---- clamp point geometry (must mirror rendering) ------------------
 // number of network ports a RjTermFace device shows
@@ -369,7 +390,8 @@ function portCount(d) {
 function pointGeom(d) {
   const W = Math.round(d.w * PX_PER_MM);
   const pts = [];
-  if (d.endcap || d.blank || (d.fn === "saf" && !d.io && !d.feed)) return { W, pts };
+  if (d.endcap) return { W, pts, block: { cap: true } };
+  if (d.blank || (d.fn === "saf" && !d.io && !d.feed)) return { W, pts };
   if (d.ext || d.junction || d.rj) {
     // network ports only — appended as wireable points (match RjTermFace)
     if (d.fiber) {
@@ -413,6 +435,14 @@ function pointGeom(d) {
     [["+", "+"], ["\u2212", "\u2212"]].forEach((pair, r) => pair.forEach((lb, ci) =>
       pts.push({ x: oc[ci], y: 196 + r * 42, label: lb, size: 8.5, col: ci })));
     return { W, pts };
+  }
+  if (d.feed && FEED12[d.id]) {
+    // EL9 feeds on the 12 mm face (must mirror El12Face): point i sits in
+    // row i >> 1, column i & 1, the same order as the feed groups
+    const c12 = [W * 0.32, W * 0.68];
+    feedGroupsFor(d).forEach((g, row) => g.labels.forEach((lb, col) =>
+      pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
+    return { W, pts, block: { cols: c12, gTop: EL12.gTop, gh: EL12.gh, el12: true, feed12: true } };
   }
   if (d.feed) {
     const cols = [W * 0.30, W * 0.70];
@@ -757,11 +787,14 @@ function pointRole(d, p) {
     if (lb === "+") return "+24 V DC output (supply source)";
     return "0 V DC output (supply return)";
   }
-  if (d.feed && d.ac) {
-    if (lb === "L") return "L \u2014 120\u2026230 V AC feed to power contacts";
-    if (lb === "N") return "N \u2014 AC neutral to power contacts";
+  if (d.feed && lb === "NC") return "Not used (no internal connection)";
+  if (d.feed && (d.ac || d.anyV)) {
+    if (lb === "L") return d.anyV ? "L \u2014 feed up to 230 V AC/DC to power contacts" : "L \u2014 120\u2026230 V AC feed to power contacts";
+    if (lb === "N") return "N \u2014 neutral to power contacts";
     return "PE \u2014 earth power contact";
   }
+  if (d.feed && d.ebus > 0 && lb === "24V") return "+24 V for the E-bus supply (Us)";
+  if (d.feed && d.ebus > 0 && lb === "0V") return "0 V for the E-bus supply";
   if (d.coupler || d.feed) {
     if (lb === "24V") return "Us +24 V in \u2014 powers coupler & E-bus";
     if (lb === "0V") return "Us 0 V in \u2014 supply return";
@@ -2355,7 +2388,7 @@ function segBackplane(seg, fsoeActive) {
     if (d.psu) continue;
     if (d.blank) { if (g) g.r = Math.max(g.r ?? L, R); continue; }
     if (d.coupler || d.cx) { push(); g = { x0: L, volt: "24", src: d.id, r: R }; continue; }
-    if (d.pcFeed) { push(); g = { x0: L, volt: d.ac ? "230" : "24", src: d.id, r: R }; continue; }
+    if (d.pcFeed) { push(); g = { x0: L, volt: d.ac ? "230" : d.anyV ? "any" : "24", src: d.id, r: R }; continue; }
     if (d.pcBreak) { push(); g = { x0: L, volt: null, src: d.id, r: R }; continue; }
     if (g) g.r = R;
   }
@@ -2381,8 +2414,8 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   for (const x of its) { cur.push(x); if (x.d.endcap) { segments.push(cur); cur = []; } }
   if (cur.length) segments.push(cur);
 
-  const pcColor = (v) => (v === "230" ? "#E8781E" : v === "24" ? "#2E9E5B" : "#9AA0A6");
-  const pcText = (v) => (v === "230" ? "230 V" : v === "24" ? "24 V" : "no feed");
+  const pcColor = (v) => (v === "230" ? "#E8781E" : v === "24" ? "#2E9E5B" : v === "any" ? "#8A7A2E" : "#9AA0A6");
+  const pcText = (v) => (v === "230" ? "230 V" : v === "24" ? "24 V" : v === "any" ? "≤ 230 V AC/DC" : "no feed");
 
   return (
     <g pointerEvents="none">
@@ -2426,7 +2459,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const uid = inst.uid;
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
   const hd16 = !!geom.block?.hd16, ed = !!geom.block?.ed;
-  const el12 = !!geom.block?.el12 || hd16 || ed; // the M7 12 mm housing
+  const cap = !!geom.block?.cap; // EL9011 / EL9012 end cover
+  const el12 = !!geom.block?.el12 || hd16 || ed || cap; // the M7 12 mm housing
 
   return (
     <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
@@ -2454,7 +2488,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {el12 && [-7.5, TH - 1.5].map((y) => (
         <g key={y}>
           <rect x="3" y={y} width={W - 6} height="9" rx="1" fill="#F3F4F5" stroke="#A9ADB1" strokeWidth="0.5" />
-          <rect x="9" y={y + 2.7} width={W - 18} height="3.6" rx="0.6" fill="#C5C9CC" />
+          <rect x={Math.min(9, W / 2 - 4)} y={y + 2.7} width={Math.max(8, W - 18)} height="3.6" rx="0.6" fill="#C5C9CC" />
         </g>
       ))}
 
@@ -2468,6 +2502,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
         d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
         d.cx ? <CxFace d={d} W={W} sim={sim} /> :
+        cap ? <EndCoverFace d={d} W={W} /> :
         d.endcap || d.blank ? <PlainFace d={d} W={W} /> :
         d.ext || d.junction || d.rj ? <RjTermFace d={d} W={W} sim={sim} /> :
         <ElFace d={d} W={W} uid={uid} geom={geom} wiredPts={wiredPts} powered={powered} sim={sim} />}
@@ -2516,7 +2551,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
 
       {/* 12 mm EL sides: E-bus springs and the orange release tab on the
           right, the three power contacts (+24 V, 0 V, PE) on the left */}
-      {el12 && (
+      {el12 && !cap && (
         <g>
           {!ed && [0, 1, 2, 3, 4, 5].map((i) => (
             <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
@@ -2568,7 +2603,18 @@ const EL12_TAB = {
   pe:  { fill: "#BCA957", edge: "#8A7C3B", ink: "#3A3420" },
   none: { fill: "#C9CBCE", edge: "#9A9EA2", ink: "#3A3F44" },
 };
+const FEED_TAB = {
+  "24V": { ...EL12_TAB.p24, text: "24V", fs: 6.4 },
+  "0V": { ...EL12_TAB.gnd, text: "0V", fs: 6.4 },
+  "+": { ...EL12_TAB.p24, text: "+", fs: 9 },
+  "−": { ...EL12_TAB.gnd, text: "−", fs: 9 },
+  "⏚": { ...EL12_TAB.pe, text: "⏚", fs: 8 },
+  L: { fill: "#B3B51B", edge: "#85870F", ink: "#2A2B10", text: "L", fs: 7 },
+  N: { fill: "#B3B51B", edge: "#85870F", ink: "#2A2B10", text: "N", fs: 7 },
+  NC: { fill: "#A19D9A", edge: "#7E7A77", ink: "#A19D9A", text: "", fs: 6 },
+};
 function el12Tab(d, n) {
+  if (FEED12[d.id]) return FEED_TAB[feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
   const p = d.pinout?.[n - 1];
   const sig = { di: "I", do: "O", ai: "AI", ao: "AO" };
   if (p && sig[p.r]) return { ...EL12_TAB.sig, text: `${sig[p.r]}${p.ch ?? ""}`, fs: p.r.length > 1 && p.r[0] === "a" ? 6 : 7 };
@@ -2611,7 +2657,11 @@ const ED_MARK = { di: ["#EBC31E", "#B8941A"], do: ["#D8322E", "#9E1F1C"], ai: ["
 // EL marker labels by signal type (checked against Beckhoff pictures: EL1008
 // yellow, EL2008 red, EL3004 green, EL4004 blue). Inputs and mixed keep the
 // approved EL yellow.
-const elMark = (d) => (d.io === "do" || d.io === "ai" || d.io === "ao" ? ED_MARK[d.io] : ["#DCD13B", "#A39A22"]);
+const elMark = (d) => {
+  const f = FEED12[d.id];
+  if (f) return f.mark === "grey" ? ["#A8A4A1", "#7E7A77"] : ["#C96E14", "#94500B"]; // feeds: orange, EL9410 grey
+  return d.io === "do" || d.io === "ai" || d.io === "ao" ? ED_MARK[d.io] : ["#DCD13B", "#A39A22"];
+};
 
 // ED push-in face (M7, confirmed on the ED1008 and ED1859). Geometry
 // mirrors pointGeom's ED branch; LED n sits beside clamp n's column.
@@ -2785,6 +2835,16 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   else if (d.fn === "mot" || d.fn === "pos") ledStates.push(powered, false, false, false);
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
 
+  if (b.feed12) {
+    // us: E-bus supply (clamp 1 / 5), up: power-contact feed (+ or L), run:
+    // E-bus alive. Off-sim a supply LED lights once its clamp is wired; the
+    // diag LEDs stay off.
+    const fed = (lbs) => geom.pts.some((p, i) => lbs.includes(p.label) && wiredPts.has(`${uid}:${i}`));
+    const lit = (k) => k === "us" ? (sim ? !!sim.us : powered && fed(["24V"]))
+      : k === "up" ? (sim ? !!sim.up : powered && fed(["+", "L"]))
+      : k === "run" ? (sim ? !!sim.alive : powered) : false;
+    return <El12Face d={d} W={W} cols={cols} states={FEED12[d.id].leds.map(lit)} />;
+  }
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
   if (b.ed) {
     const st = Array.from({ length: d.hd ? 16 : 8 }, (_, s) => {
@@ -2972,6 +3032,21 @@ function RjTermFace({ d, W, sim = null }) {
           <Rj45 key={i} cx={W / 2} y={78 + i * pitch} tag={n > 1 ? `X${i + 1}` : d.ext ? "OUT" : "X1"} />
         ))
       )}
+    </g>
+  );
+}
+
+// EL9011 / EL9012 end cover on the M7 housing: plain cover, the slots that
+// take the last terminal's E-bus springs on the left, print up the middle
+function EndCoverFace({ d, W }) {
+  return (
+    <g>
+      <rect x={W - 2.5} y="2" width="1" height={TH - 4} fill="#000000" opacity="0.08" />
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <rect key={i} x="-0.6" y={29 + i * 14} width="2" height="6" rx="0.5" fill="#B9BDC1" />
+      ))}
+      <text x={W / 2} y="168" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace"
+        textAnchor="middle" transform={`rotate(-90 ${W / 2} 168)`}>{d.id}</text>
     </g>
   );
 }
