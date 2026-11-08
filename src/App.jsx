@@ -2608,6 +2608,10 @@ function PushIn({ x, y, hl }) {
 // ED marker-label colour by signal type, as on Beckhoff's ED terminals:
 // inputs yellow, outputs red, analog inputs green, analog outputs blue
 const ED_MARK = { di: ["#EBC31E", "#B8941A"], do: ["#D8322E", "#9E1F1C"], ai: ["#3DAF4B", "#28803A"], ao: ["#2F7FD0", "#1F5C9A"] };
+// EL marker labels by signal type (checked against Beckhoff pictures: EL1008
+// yellow, EL2008 red, EL3004 green, EL4004 blue). Inputs and mixed keep the
+// approved EL yellow.
+const elMark = (d) => (d.io === "do" || d.io === "ai" || d.io === "ao" ? ED_MARK[d.io] : ["#DCD13B", "#A39A22"]);
 
 // ED push-in face (M7, confirmed on the ED1008 and ED1859). Geometry
 // mirrors pointGeom's ED branch; LED n sits beside clamp n's column.
@@ -2683,8 +2687,8 @@ function Hd16Face({ d, W, cols, states }) {
   return (
     <g>
       <text x={W / 2} y="9.2" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
-      <rect x="4.5" y="12" width="20.5" height="12" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
-      <rect x={W - 25} y="12" width="20.5" height="12" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      <rect x="4.5" y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
+      <rect x={W - 25} y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W / 2 - 13.5} y="28" width="27" height="72" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
       <rect x={W / 2 - 11.5} y="30" width="23" height="68" rx="1" fill="#2C2F32" />
       {Array.from({ length: 16 }).map((_, s) => {
@@ -2737,8 +2741,8 @@ function El12Face({ d, W, cols, states }) {
   return (
     <g>
       {/* marker labels */}
-      <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
-      <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill="#DCD13B" stroke="#A39A22" strokeWidth="0.5" />
+      <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
+      <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       {/* LED window: 4 rows × 2, slot s at row ⌊s/2⌋, column s mod 2 */}
       <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
       <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />

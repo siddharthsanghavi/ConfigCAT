@@ -357,7 +357,9 @@ is verified. EL1002 gained its pinout from the reference.
 eight push-in rows, brand print between rows 3 and 4. EL1859 is in the
 catalog as the first mixed terminal (`io: "mix"`, channels from its pinout).
 The user confirmed the 8- and 16-point faces as the basis for the rest of
-the EL range.
+the EL range. EL marker labels now follow the same signal-type colours
+(checked against the product finder pictures: EL1008 yellow, EL2008 red,
+EL3004 green, EL4004 blue; `elMark(d)`), clamp tabs unchanged.
 
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
