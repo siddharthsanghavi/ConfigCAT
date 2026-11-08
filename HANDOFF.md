@@ -60,6 +60,8 @@ npm run shots          # regenerate README screenshots (see below)
   share the `EL12` row constants, and the tab colours come from the pinout
   (`el12Tab`; no pinout → grey clamp numbers). `TH` is 336. HD I/O
   terminals take `Hd16Face` (the `hd16` branch, rows in `HD16.rows`).
+  ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
+  `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the
   pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
   terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the

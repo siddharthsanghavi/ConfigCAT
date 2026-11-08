@@ -331,6 +331,14 @@ const EL12 = { gTop: 68, gh: 62.5, entry: 42 };
 // HD 16-point face (M7, EL1859 pilot): eight push-in rows, a gap for the
 // brand print after row 3 and one for the 0 V power contact after row 5.
 const HD16 = { rows: [120, 144.5, 169, 206, 230.5, 268, 292.5, 317] };
+// ED push-in face (M7, ED1008 / ED1859 pilots): four raised clamp blocks.
+// 8-point: tab, push button, square entry per clamp; 16-point: 2 × 2 per block.
+const ED = { g: [78, 140, 202, 264] };
+const edPointY = (d, p) => {
+  if (!d.hd) return ED.g[p % 4] + 41.5;
+  const i = p % 8;
+  return ED.g[i >> 1] + (i & 1) * 27 + 18;
+};
 const RAIL_PAD_X = 26;
 const RAIL_GAP = 130;
 const RAIL_TOP = 44; // room for ID badges
@@ -416,6 +424,15 @@ function pointGeom(d) {
   // io / dist / motion / position / plain comm
   const hd = !!d.hd;
   const cols = [W * 0.30, W * 0.70];
+  if (d.ed) {
+    // ED push-in terminals (must mirror EdFace)
+    const ce = [W * 0.31, W * 0.69], n = hd ? 16 : 8;
+    for (let p = 0; p < n; p++) {
+      const col = p < n / 2 ? 0 : 1;
+      pts.push({ x: ce[col], y: edPointY(d, p), label: String(p + 1), size: 6.5, col, round: true, sq: true });
+    }
+    return { W, pts, block: { cols: ce, ed: true } };
+  }
   if (hd && !d.dist && d.fn !== "sys") {
     // HD terminals: the redrawn face (must mirror Hd16Face)
     const c16 = [W * 0.32, W * 0.68];
@@ -2408,8 +2425,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const W = geom.W;
   const uid = inst.uid;
   const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
-  const hd16 = !!geom.block?.hd16;
-  const el12 = !!geom.block?.el12 || hd16; // the M7 12 mm housing
+  const hd16 = !!geom.block?.hd16, ed = !!geom.block?.ed;
+  const el12 = !!geom.block?.el12 || hd16 || ed; // the M7 12 mm housing
 
   return (
     <g transform={`translate(${t.x}, ${t.y + (selected ? -8 : 0)})`} data-uid={uid}
@@ -2480,8 +2497,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         if (p.round) {
           return (
             <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
-              <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} />
-              <rect x={p.x - (p.r ? 7.5 : 9.5)} y={p.y - (p.r ? 15.5 : 27)} width={p.r ? 15 : 19} height={p.r ? 22 : 36} fill="transparent">
+              {p.sq ? <PushIn x={p.x} y={p.y} hl={isPending} /> : <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} />}
+              <rect x={p.x - (p.sq ? 8 : p.r ? 7.5 : 9.5)} y={p.y - (p.sq ? 18.5 : p.r ? 15.5 : 27)} width={p.sq ? 16 : p.r ? 15 : 19} height={p.sq ? 26 : p.r ? 22 : 36} fill="transparent">
                 <title>{pointRole(d, p)}</title>
               </rect>
             </g>
@@ -2501,11 +2518,11 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
           right, the three power contacts (+24 V, 0 V, PE) on the left */}
       {el12 && (
         <g>
-          {[0, 1, 2, 3, 4, 5].map((i) => (
+          {!ed && [0, 1, 2, 3, 4, 5].map((i) => (
             <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
           ))}
-          <rect x={W - 2} y={hd16 ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
-          {(hd16 ? [179, 241] : [179, 246, 310]).map((y) => (
+          <rect x={W - 2} y={hd16 || ed ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill={ed ? "#EE7A3C" : "#F0961C"} stroke={ed ? "#B9561F" : "#BF730E"} strokeWidth="0.5" />
+          {(ed ? [168, 232] : hd16 ? [179, 241] : [179, 246, 310]).map((y) => (
             <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
           ))}
         </g>
@@ -2572,6 +2589,81 @@ function RoundClamp({ x, y, hl, r }) {
         : <rect x={x - 9.5} y={y - 27} width="19" height="36" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />)}
       <circle cx={x} cy={y} r={R} fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
       <circle cx={x} cy={y} r={R * 0.7} fill="#2E3134" />
+    </g>
+  );
+}
+
+// square push-in opening of an ED clamp (the clickable wiring point)
+function PushIn({ x, y, hl }) {
+  return (
+    <g>
+      {hl && <rect x={x - 8} y={y - 18.5} width="16" height="26" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
+      <rect x={x - 6.5} y={y - 6.5} width="13" height="13" rx="0.8" fill="#D9DCDF" stroke="#A3A7AB" strokeWidth="0.5" />
+      <rect x={x - 4.5} y={y - 4.5} width="9" height="9" rx="0.5" fill="#7D8185" />
+      <rect x={x - 4.5} y={y - 4.5} width="9" height="1.6" rx="0.5" fill="#55595D" />
+    </g>
+  );
+}
+
+// ED marker-label colour by signal type, as on Beckhoff's ED terminals:
+// inputs yellow, outputs red, analog inputs green, analog outputs blue
+const ED_MARK = { di: ["#EBC31E", "#B8941A"], do: ["#D8322E", "#9E1F1C"], ai: ["#3DAF4B", "#28803A"], ao: ["#2F7FD0", "#1F5C9A"] };
+
+// ED push-in face (M7, confirmed on the ED1008 and ED1859). Geometry
+// mirrors pointGeom's ED branch; LED n sits beside clamp n's column.
+function EdFace({ d, W, cols, states }) {
+  const n = d.hd ? 16 : 8, rows = n / 2;
+  const [mk, mkE] = ED_MARK[d.io] || ED_MARK.di;
+  // an illustrative Data Matrix pattern, stable per part (not a real code)
+  let seed = [...d.id].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+  const dots = [];
+  for (let cx = 0; cx < 26; cx++) for (let cy = 0; cy < 7; cy++)
+    if (cx === 0 || cy === 6 || rnd() < 0.45) dots.push(<rect key={`${cx}-${cy}`} x={W / 2 - 13 + cx} y={2.4 + cy} width="1" height="1" fill="#1E2124" />);
+  const top = 29.5, h = rows === 4 ? 44 : 46, pitch = (h - 6) / rows;
+  const sig = { di: "I", do: "O", ai: "AI", ao: "AO" };
+  return (
+    <g>
+      {ED.g.map((g) => <rect key={g} x="3" y={g - 4} width={W - 6} height="58" rx="1.2" fill="#ECEEF0" stroke="#C3C7CB" strokeWidth="0.5" />)}
+      <rect x={W / 2 - 14} y="1.6" width="28" height="8.4" rx="0.6" fill="#FFFFFF" stroke="#C3C7CB" strokeWidth="0.4" />
+      {dots}
+      <rect x="4.5" y="11.5" width="21.5" height="15.5" rx="1" fill={mk} stroke={mkE} strokeWidth="0.5" />
+      <rect x={W - 26} y="11.5" width="21.5" height="15.5" rx="1" fill={mk} stroke={mkE} strokeWidth="0.5" />
+      <rect x={W / 2 - 9.5} y={top} width="19" height={h} rx="1" fill="#D3E3CC" stroke="#A9BBA2" strokeWidth="0.5" />
+      <rect x={W / 2 - 7.9} y={top + 1.6} width="15.8" height={h - 3.2} rx="0.6" fill="#5B5F63" />
+      {Array.from({ length: n }).map((_, s) => {
+        const c = s < rows ? 0 : 1, r = s % rows;
+        const y = top + 3 + r * pitch + (pitch - 3.4) / 2, x = c ? W / 2 + 1.3 : W / 2 - 6.3, on = states[s];
+        const col = on === "red" ? "#FF3B30" : "#B7EE3F";
+        return (
+          <g key={s}>
+            <rect x={x} y={y} width="5" height="3.4" rx="0.5" fill="#747A7F" />
+            {on && <rect x={x} y={y} width="5" height="3.4" rx="0.5" fill={col} />}
+            {on && <rect x={x} y={y} width="5" height="3.4" rx="0.5" fill={col} opacity="0.55" filter="blur(1.2px)" />}
+            <text x={c ? W - 11.5 : 11.5} y={y + 2.9} fill="#3A3F44" fontSize={rows === 4 ? 5.2 : 3.9} fontWeight="500" fontFamily="system-ui" textAnchor="middle">{s + 1}</text>
+          </g>
+        );
+      })}
+      {Array.from({ length: n }).map((_, s) => {
+        const ci = s < rows ? 0 : 1, cx = cols[ci], y = edPointY(d, s), by = y - (d.hd ? 16.5 : 17.5);
+        const p = d.pinout?.[s];
+        const tab = !d.hd && (p && sig[p.r] ? { fill: "#EBC31E", edge: "#B8941A", ink: "#1E1E16", text: `${sig[p.r]}${p.ch ?? ""}`, fs: p.r[0] === "a" ? 7 : 9 }
+          : p?.r === "p24" ? { ...EL12_TAB.p24, text: "+", fs: 10 } : p?.r === "gnd" ? { ...EL12_TAB.gnd, text: "\u2212", fs: 10 }
+          : p?.r === "pe" ? { ...EL12_TAB.pe, text: "\u23DA", fs: 9 } : { ...EL12_TAB.none, text: String(s + 1), fs: 7.5 });
+        return (
+          <g key={s}>
+            {tab && <rect x={cx - 10.25} y={y - 41.5} width="20.5" height="17" rx="1" fill={tab.fill} stroke={tab.edge} strokeWidth="0.5" />}
+            {tab && <text x={cx} y={y - 41.5 + 8.5 + tab.fs * 0.36} fill={tab.ink} fontSize={tab.fs} fontWeight="600" fontFamily="system-ui" textAnchor="middle">{tab.text}</text>}
+            <rect x={cx - 6.5} y={by} width="13" height="7.5" rx="0.8" fill="#EE7A3C" stroke="#B9561F" strokeWidth="0.5" />
+            <rect x={cx - 5.5} y={by + 3} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+            <rect x={cx - 5.5} y={by + 5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+            <circle cx={cx - 0.5} cy={by + 0.6} r="1.7" fill="#2B2E31" />
+            <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{s + 1}</text>
+          </g>
+        );
+      })}
+      <text x="5" y={TH - 13.8} fill="#2B2F33" fontSize="6" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.2px" }}>BECKHOFF</text>
+      <text x="5" y={TH - 5.6} fill="#2B2F33" fontSize="5.6" fontWeight="600" fontFamily="ui-monospace,monospace">{d.id}</text>
     </g>
   );
 }
@@ -2690,6 +2782,14 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
   else if (d.fn === "saf" && !d.io) ledStates.push(powered, false);
 
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
+  if (b.ed) {
+    const st = Array.from({ length: d.hd ? 16 : 8 }, (_, s) => {
+      const i = pointChannelIdx(d, s);
+      if (i < 0) return false;
+      return sim ? !!sim.ch?.[i] : powered && wiredPts.has(`${uid}:${s}`);
+    });
+    return <EdFace d={d} W={W} cols={cols} states={st} />;
+  }
   if (b.hd16) {
     const hd = Array.from({ length: 16 }, (_, s) => {
       const i = pointChannelIdx(d, s);

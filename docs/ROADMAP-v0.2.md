@@ -359,6 +359,14 @@ catalog as the first mixed terminal (`io: "mix"`, channels from its pinout).
 The user confirmed the 8- and 16-point faces as the basis for the rest of
 the EL range.
 
+**ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
+`EdFace`): Data Matrix code, marker labels coloured by signal type
+(inputs yellow, outputs red, analog in green, analog out blue, from
+Beckhoff's ED pictures), light-green LED window, orange push buttons over
+square push-in openings on raised blocks, print bottom-left. 26 ED parts
+in the catalog (12 mm, 8- and 16-point, from beckhoff.com). Still to add:
+24 mm, D-sub and special ED parts (with family 6) and ED9xxx (with family 3).
+
 **The pilot settles, once for every family:**
 - Proportions: housing 336 px (was 292) plus latch hooks, about 352 px in
   all, closer to the real 12 × 100 mm terminal. `TH` and the rail stripe

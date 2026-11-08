@@ -14,7 +14,7 @@
       "file": "docs/images/wiring.png",
       "width": 2760,
       "height": 844,
-      "kb": 425,
+      "kb": 426,
       "caption": "Wire tool mid-connection — press two points and the right cable is chosen for you"
     },
     {
@@ -38,7 +38,7 @@
       "file": "docs/images/simulate.png",
       "width": 3360,
       "height": 2520,
-      "kb": 1268,
+      "kb": 1269,
       "caption": "Simulate: a TwinCAT master runs the I/O check program; the sensor lights its input LED, the stack light follows the output"
     },
     {
@@ -46,7 +46,7 @@
       "file": "docs/images/palette.png",
       "width": 488,
       "height": 1440,
-      "kb": 87,
+      "kb": 86,
       "caption": "Palette by company, then category"
     },
     {
