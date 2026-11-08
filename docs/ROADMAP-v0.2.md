@@ -380,9 +380,14 @@ Board 03c (confirmed) followed: EL9200 / EL9210 on their own fused face
 12 mm face via `FEED12` (voltage on the U0 tabs; `uOut` marks a supply whose
 power contacts carry U0, which the 24 V solver leaves undriven and
 validation flags for 24 V parts after it), EL9080 on `SeparationFace`.
-Still on the old face: EL9501 (no Infosys pinout found) and the special
-terminals (shield, surge filter, buffer capacitor, brake chopper,
-electronic fuses).
+Board 03d (confirmed) followed: the special terminals. EL9195 (shield feed,
+1 ↔ 5 bridged, blank tabs), EL9540 / EL9550 (surge filters; EL9550 carries
+the system supply 4 / 8 in, 1 / 5 out as `sysFilter`) and EL9221 / 9222 /
+9227 (`efuse`: I1 / O1 / I2 / O2 tabs, output 1 on the + contact; channels
+taken as closed, switching and tripping not simulated) go through `FEED12`;
+EL9070 (all clamps bridged) and EL9570 / EL9576 (R clamps, +Uin / −Uin on
+the contacts) are `pins` parts with `PIN_TABS` / `PIN_LEDS`. Still on the
+old face: EL9501 (no Infosys pinout found); EL9540-0010 not added (no picture).
 
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type

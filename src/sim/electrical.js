@@ -114,6 +114,17 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else to(i, pcpe);
         } else if (d.feed) {
           if (!d.pcFeed || lb === "NC") return; // EL91x0 clamps 1 / 5: not used
+          // EL922x electronic fuses: 24 V in on 2 / 6, output 1 drives the +
+          // contact, output 2 its own clamp; the channels are taken as closed
+          // (switching and tripping are not simulated), the DI clamps unused
+          if (d.efuse) {
+            if (lb === "O1" || lb === "O2" || lb === "+") to(i, pc24);
+            else if (lb === "−") to(i, pc0);
+            return;
+          }
+          if (lb === "B") { to(i, `br:${uid}:1`); return; } // EL9195 1 ↔ 5
+          // EL9550: system supply in on 4 / 8, filtered out on 1 / 5
+          if (d.sysFilter && (lb === "S+" || lb === "S−")) { to(i, lb === "S+" ? `us24:${uid}` : `us0:${uid}`); return; }
           if (d.ac || d.anyV) { to(i, lb === "L" ? `pcL:${g}` : lb === "N" ? `pcN:${g}` : pcpe); return; }
           // EL95xx: 24 V in on clamps 1 / 5; the power contacts carry U0, which
           // the 24 V solver leaves undriven. 0 V in and out share a reference

@@ -370,6 +370,15 @@ const AC_FEED_GROUPS = [
 // (slot 0 top-left, 1 top-right, …) from Beckhoff's pictures and Infosys.
 // EL9410: Power (E-bus), Power, Diag Us, Diag Up, RUN; the EL91x0 parts have
 // one Power LED top right; the EL9190 has none.
+const EFUSE_GROUPS = (two) => [
+  { labels: ["I1", "O1"], colors: ["gy", "gy"] },
+  { labels: ["+", "+"],   colors: ["red", "red"] },
+  { labels: ["−", "−"],   colors: ["blue", "blue"] },
+  { labels: two ? ["I2", "O2"] : ["X", "X"], colors: ["gy", "gy"] },
+];
+const BLANK = { fill: "#A19D9A", edge: "#7E7A77", ink: "#A19D9A", text: "", fs: 6 };
+const OLIVE = (text) => ({ fill: "#B3B51B", edge: "#85870F", ink: "#2A2B10", text, fs: 6.4 });
+const EFUSE_TABS = { I1: OLIVE("I1"), O1: OLIVE("O1"), I2: OLIVE("I2"), O2: OLIVE("O2"), X: { hide: true } };
 const FEED12 = {
   EL9410: { mark: "grey", g: FEED_GROUPS, leds: ["us", "up", "diag", "diag", "run"] },
   EL9100: { mark: "orange", g: PC_FEED_GROUPS, leds: [null, "up"] },
@@ -383,7 +392,29 @@ const FEED12 = {
   ...Object.fromEntries([["EL9505", "5V"], ["EL9508", "8V"], ["EL9510", "10V"], ["EL9512", "12V"], ["EL9515", "15V"]].map(([id, v]) =>
     [id, { mark: "grey", g: FEED_GROUPS, leds: ["us", "us", "diag"], tabs: { "+": { text: v, fs: 6.4 } } }])),
   EL9560: { mark: "grey", g: FEED_GROUPS, leds: ["us", "us", null, null, "us"], tabs: { "+": { text: "U₀", fs: 6.4 }, "−": { text: "0V", fs: 6.4 } } },
+  // special terminals (board 03d): EL9195 shield feed (1 ↔ 5 bridged, blank
+  // grey tabs), EL9540 / EL9550 surge filters, EL922x electronic fuses
+  EL9195: { mark: "orange", g: [
+    { labels: ["B", "B"], colors: ["gy", "gy"] }, { labels: ["L", "L"], colors: ["gy", "gy"] },
+    { labels: ["N", "N"], colors: ["gy", "gy"] }, { labels: ["⏚", "⏚"], colors: ["kh", "kh"] }],
+    leds: [], tabs: { B: BLANK, L: BLANK, N: BLANK, "⏚": BLANK } },
+  EL9540: { mark: "orange", g: PC_FEED_GROUPS, leds: [null, "up"], tabs: { "+": { text: "24V", fs: 6.4 }, "−": { text: "0V", fs: 6.4 } } },
+  EL9550: { mark: "orange", g: [
+    { labels: ["S+", "S−"], colors: ["red", "blue"] }, { labels: ["+", "+"], colors: ["red", "red"] },
+    { labels: ["−", "−"], colors: ["blue", "blue"] }, { labels: ["S+", "S−"], colors: ["red", "blue"] }],
+    leds: ["up", "us"], tabs: { "S+": { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF", text: "24V", fs: 6.4 }, "S−": { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF", text: "0V", fs: 6.4 },
+      "+": { text: "24V", fs: 6.4 }, "−": { text: "0V", fs: 6.4 } } },
+  EL9221: { mark: "grey", g: EFUSE_GROUPS(false), leds: ["run", "run", "up"], tabs: EFUSE_TABS },
+  EL9222: { mark: "grey", g: EFUSE_GROUPS(true), leds: ["run", "run", "up", null, "up"], tabs: EFUSE_TABS },
+  EL9227: { mark: "grey", g: EFUSE_GROUPS(true), leds: ["run", "run", "up", null, "up"], tabs: EFUSE_TABS },
 };
+// EL9570 buffer capacitor / EL9576 brake chopper: R tabs on clamps 1 / 5,
+// LED slots from the pictures (EL9576: RUN and Out voltage OK green)
+const PIN_TABS = {
+  EL9570: { 1: { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF", text: "R", fs: 6.4 }, 5: { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF", text: "R", fs: 6.4 } },
+};
+PIN_TABS.EL9576 = PIN_TABS.EL9570;
+const PIN_LEDS = { EL9576: ["up", "up"] };
 // EL9200 / EL9210 (Infosys; rows measured on the product picture): clamps
 // 1-3 left, 4-6 right, n and n + 3 linked to the same power contact
 const FUSED = { rows: [94, 188.5, 254], labels: [["+", "+"], ["−", "−"], ["⏚", "⏚"]] };
@@ -804,7 +835,21 @@ function pointRole(d, p) {
     if (lb === "+") return "+24 V DC output (supply source)";
     return "0 V DC output (supply return)";
   }
-  if (d.feed && lb === "NC") return "Not used (no internal connection)";
+  if (d.feed && (lb === "NC" || lb === "X")) return "Not used (no internal connection)";
+  if (d.feed && lb === "B") return "Bridged to the other B clamp (1 \u2194 5) only";
+  if (d.efuse) {
+    if (lb[0] === "I") return `DI${lb[1]} \u2014 switches channel ${lb[1]} on / off`;
+    if (lb === "O1") return "Protected output 1 \u2014 drives the + power contact";
+    if (lb === "O2") return "Protected output 2";
+    if (lb === "+") return "+24 V supply in";
+    if (lb === "\u2212") return "0 V in (to the 0 V power contact)";
+  }
+  if (d.sysFilter) {
+    if (lb === "S+") return "System +24 V (4 in, 1 filtered out)";
+    if (lb === "S\u2212") return "System 0 V (8 in, 5 filtered out)";
+    if (lb === "+") return "Field +24 V in \u2014 feeds the + power contact";
+    if (lb === "\u2212") return "Field 0 V \u2014 the \u2212 power contact";
+  }
   if (d.feed && (d.ac || d.anyV)) {
     if (lb === "L") return d.anyV ? "L \u2014 feed up to 230 V AC/DC to power contacts" : "L \u2014 120\u2026230 V AC feed to power contacts";
     if (lb === "N") return "N \u2014 neutral to power contacts";
@@ -833,6 +878,7 @@ function pointRole(d, p) {
     if (p === "pe") return `Pt ${lb} \u2014 PE (from the PE power contact)`;
     if (p === "up") return `Pt ${lb} \u2014 + power contact (any voltage up to 230 V)`;
     if (p === "un") return `Pt ${lb} \u2014 \u2212 power contact (any voltage up to 230 V)`;
+    if (p[0] === "r") return `Pt ${lb} \u2014 external resistor`;
     const mates = d.pins.map((q, i) => (q === p && i !== Number(lb) - 1 ? i + 1 : null)).filter(Boolean);
     return `Pt ${lb} \u2014 free bridge, connected to ${mates.join(", ")} only`;
   }
@@ -2658,6 +2704,7 @@ function el12Tab(d, n) {
   if (d.pins) {
     // EL9186 / EL9187 carry olive marker tabs numbered across the rows
     // (01 02 / 03 04 …), the others show their potential
+    if (PIN_TABS[d.id]?.[n]) return PIN_TABS[d.id][n];
     if (d.distTabs === "num") return { ...FEED_TAB.L, text: `0${((n - 1) % 4) * 2 + (n <= 4 ? 1 : 2)}`, fs: 6.4 };
     return FEED_TAB[DIST_TAB[d.pins[n - 1]] || "NC"];
   }
@@ -2849,8 +2896,8 @@ function El12Face({ d, W, cols, states }) {
         const n = ci * 4 + row + 1, g = EL12.gTop + row * EL12.gh, cx = cols[ci], t = el12Tab(d, n);
         return (
           <g key={n}>
-            <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />
-            <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>
+            {!t.hide && <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />}
+            {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
             <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
             <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
             <text x={cx - 8.2} y={g + 33.6} fill="#51565B" fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
@@ -2858,7 +2905,7 @@ function El12Face({ d, W, cols, states }) {
         );
       }))}
       {/* part print */}
-      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize={d.id.length > 6 ? 5 : 6.4} fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
       {beckhoff && <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>}
     </g>
   );
@@ -2891,11 +2938,12 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
     // E-bus alive. Off-sim a supply LED lights once its clamp is wired; the
     // diag LEDs stay off.
     const fed = (lbs) => geom.pts.some((p, i) => lbs.includes(p.label) && wiredPts.has(`${uid}:${i}`));
-    const lit = (k) => k === "us" ? (sim ? !!sim.us : powered && fed(["24V"]))
+    const lit = (k) => k === "us" ? (sim ? !!sim.us : powered && fed(["24V", "S+"]))
       : k === "up" ? (sim ? !!sim.up : powered && fed(["+", "L"]))
       : k === "run" ? (sim ? !!sim.alive : powered) : false;
     return <El12Face d={d} W={W} cols={cols} states={FEED12[d.id].leds.map(lit)} />;
   }
+  if (b.el12 && PIN_LEDS[d.id]) return <El12Face d={d} W={W} cols={cols} states={PIN_LEDS[d.id].map(() => (sim ? !!sim.up : powered))} />;
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
   if (b.ed) {
     const st = Array.from({ length: d.hd ? 16 : 8 }, (_, s) => {

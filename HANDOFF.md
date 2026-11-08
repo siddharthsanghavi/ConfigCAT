@@ -70,6 +70,10 @@ npm run shots          # regenerate README screenshots (see below)
   `d.fused` (EL9200 / EL9210) → `FusedFace`; `d.sep` (EL9080) →
   `SeparationFace`; `d.uOut` (EL95xx) → a supply: 24 V in on clamps 1 / 5,
   U0 on the + clamps and power contacts (node `uo:<uid>` below 24 V).
+  Special EL9 feeds also use `FEED12`: label `B` is the EL9195 1 ↔ 5 bridge,
+  `S+` / `S−` the EL9550 system supply (nodes `us24` / `us0`), `I1`…`O2` the
+  EL922x switch inputs and protected outputs (`d.efuse`), `X` a clamp
+  without a tab. `PIN_TABS` / `PIN_LEDS` dress `pins` parts (EL9570 / 9576).
   ED parts (`ed: true`) take `EdFace` (the `ed` branch, `ED.g` blocks,
   `edPointY`), with square `PushIn` wiring points.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the

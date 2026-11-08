@@ -16,7 +16,11 @@ export function classifyPoint(d, label) {
     if (label === "⏚") return "pe";
     return null;
   }
-  if (d.feed && label === "NC") return null;                       // not used
+  if (d.feed && (label === "NC" || label === "B" || label === "X")) return null; // not used / free bridge
+  if (d.feed && d.efuse && label[0] === "I") return null;          // EL922x switch inputs
+  if (d.feed && d.efuse && label[0] === "O") return "do";          // EL922x protected outputs
+  if (d.feed && label === "S+") return "p24";                      // EL9550 system supply
+  if (d.feed && label === "S−") return "gnd";
   if (d.feed && d.anyV) return label === "⏚" ? "pe" : null;         // EL9190: any voltage
   if (d.feed && d.ac) return label === "⏚" ? "pe" : "ac";
   if (d.feed && d.uOut && d.uOut !== 24 && label === "+") return null; // U0 output, not 24 V
