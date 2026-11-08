@@ -24,6 +24,7 @@ export function ebusSegments(rails, byId) {
       const d = byId[inst.catId]; if (!d) continue;
       if (inst.gap > 0) close();
       if (d.psu) { close(); continue; }
+      if (d.cxk === "mod") continue; // CX2500 modules sit on the CPU's system bus, not the E-bus
       if (d.coupler || d.cx) { close(); cur = { ri, head: inst.uid, headD: d, items: [] }; }
       if (!cur) cur = { ri, head: null, headD: null, items: [] };
       cur.items.push(inst.uid);
@@ -177,7 +178,8 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
       for (const uid of s.items) {
         reachable.add(uid);
         const d = pos[uid]?.d;
-        if (!d || d.cx || d.endcap || d.blank) continue;
+        // a CX70xx's own I/O (CX7028 interface) is listed like a slave
+        if (!d || (d.cx && !d.io) || d.endcap || d.blank) continue;
         addSlave(uid, d, ioChannels(d));
       }
     } else {

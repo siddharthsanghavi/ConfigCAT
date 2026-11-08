@@ -434,6 +434,19 @@ parts change width (later parts move) and the comm terminals lose their
 old generic clamps, so wires saved on them point at the wrong place and need
 redrawing.
 
+**Embedded PCs (board 07, in the app, awaiting review):** every CX on
+beckhoff.com (64 parts: CX70xx, CX80xx, CX81xx, CX82xx, CX9020, CX9240,
+CX51x0–CX56x0, CX20x2 / CX20x3, CX2100 power supplies, CX2500 / CX2550
+modules) with widths, interfaces and E-bus currents from the product pages.
+`cxk` picks the face (`CxM7Face`, connectors from `cxLayout`): the coupler's
+power block on the right (Us 24 V / 0 V, Up + / −, PE), or on the CX70xx the
+16-point I/O block from Infosys (8 DI + 4 DO, listed in Simulate as the
+CX7028 interface). CX20xx need a CX2100 to their right (it powers the CPU and
+the E-bus); CX2500 modules sit left of the CPU, off the E-bus. RJ45 / USB /
+DVI / DP / D-sub are wire points. CX80xx simulate as TwinCAT 2. The
+power-contact lane moved under the terminals. Saved projects: CX widths
+change and their old 4 clamps become the 8-clamp power block.
+
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
 (inputs yellow, outputs red, analog in green, analog out blue, from
@@ -465,7 +478,7 @@ in the catalog (12 mm, 8- and 16-point, from beckhoff.com). Still to add:
 | 4 | Couplers and junctions | 26 | EK1100, EK1101-0010, EK1501, EK1110, EK1122 |
 | 5 | TwinSAFE | 9 | EL1904, EL2904, EL6910, EL1918, EK1914, EK1960 |
 | 6 | Wide and special EL (done, board 06) | 45 incl. 10 ED | EL6614, EL6731, EL7041, EL7211-0010, ED7062 |
-| 7 | Embedded PCs (CX) | 12 | CX7000, CX8190, CX9020, CX5140, CX2033 |
+| 7 | Embedded PCs (CX) (in the app, board 07) | 64 | CX7000, CX8190, CX9020, CX5130, CX2033 + CX2100 |
 | 8 | Power supplies | 8 | PS1011-2410, PS2001-4810, PS3021-2440 |
 | 9 | EtherCAT Box IP67 | 14 | EP1008-0001, EP2338-0001, EP3174-0002 |
 | 10 | Drives and motors | 6 | AX5103, AX5203, AX8100, AX8206, AM8031 |

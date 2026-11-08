@@ -97,6 +97,13 @@ npm run shots          # regenerate README screenshots (see below)
   Pinout entries may carry `t` (hover text) and `tab` ("+", "−" or a label).
   D-sub / DeviceNet ports wire with the `fbus` cable (net `bus`).
   `RENAMED` in `sanitizeDoc` maps retired ids (EL7222 → EL7211-0010).
+  Board 07 (embedded PCs): `d.cxk` (c7 / c8 / pc / c20 / psu / mod) →
+  `CxM7Face`, connector positions from `cxLayout` (shared with `pointGeom`).
+  c7 / c8 / pc / psu carry the `cplr` block at `bx = W − 53` (CX70xx: 16 HD
+  points with `CX7_PINS`, others the `FEED_GROUPS` power block). `electrical.js`
+  treats CX power blocks like a coupler; a CX2100 (`cxk: "psu"`) feeds the
+  `us24` / `us0` nodes of the CX20xx head to its left. `cxk: "mod"` parts are
+  skipped by `ebusSegments`, validation and topology.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the
   pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
   terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the

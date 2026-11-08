@@ -77,7 +77,7 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
 
   // ---- rails ----------------------------------------------------------
   doc.rails.forEach((rail) => {
-    let g = null;
+    let g = null, head = null;
     const newGroup = (feeder) => { g = groups.length; groups.push({ id: g, feeder }); };
     for (const inst of rail.items) {
       const t = pos[inst.uid]; if (!t) continue;
@@ -93,7 +93,7 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         supplies.push({ uid, plus, minus, acL: L >= 0 ? P(uid, L) : null, acN: N >= 0 ? P(uid, N) : null, acWired: isWired(uid, L) });
         continue;
       }
-      if (d.coupler || d.cx) newGroup(uid);
+      if (d.coupler || d.cx) { newGroup(uid); head = uid; }
       else if (d.pcFeed) newGroup(uid);
       groupOf[uid] = d.pcBreak && !d.pcFeed ? null : g;
       const pc24 = g !== null ? `pc24:${g}` : null, pc0 = g !== null ? `pc0:${g}` : null, pcpe = g !== null ? `pcpe:${g}` : null;
@@ -102,8 +102,8 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
       pts.forEach((p, i) => {
         if (p.port) return;
         const lb = p.label;
-        if (d.coupler && d.pinout) {
-          // EK18xx / EK1914 / EK1960: roles from the verified pinout, by point
+        if ((d.coupler || d.cx) && d.pinout) {
+          // EK18xx / EK1914 / EK1960 / CX70xx: roles from the verified pinout, by point
           const q = d.pinout[i];
           if (!q || !q.r) return;
           if (q.r === "us24") to(i, `us24:${uid}`);
@@ -113,15 +113,19 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (q.r === "clk") { to(i, `clk:${uid}:${i + 1}`); fixed.push({ node: `clk:${uid}:${i + 1}`, v: "p24" }); }
           else if (q.r === "usup") to(i, `ups:${uid}:${q.k}`);
           else to(i, `ch:${uid}:${i + 1}`);
+        } else if (d.coupler || d.cx || d.cxk === "psu") {
+          // couplers, CX power blocks; a CX2100 supplies the CX20xx to its left
+          const us = d.cxk === "psu" ? head : uid;
+          if (lb === "24V") to(i, us && `us24:${us}`);
+          else if (lb === "0V") to(i, us && `us0:${us}`);
+          else if (lb === "+") to(i, pc24);
+          else if (lb === "−") to(i, pc0);
+          else to(i, pcpe);
         } else if (d.coupler) {
           if (lb === "24V") to(i, `us24:${uid}`);
           else if (lb === "0V") to(i, `us0:${uid}`);
           else if (lb === "+") to(i, pc24);
           else if (lb === "−") to(i, pc0);
-          else to(i, pcpe);
-        } else if (d.cx) {
-          if (lb === "24V") { to(i, `us24:${uid}`); to(i, pc24); }
-          else if (lb === "0V") { to(i, `us0:${uid}`); to(i, pc0); }
           else to(i, pcpe);
         } else if (d.feed) {
           if (!d.pcFeed || lb === "NC") return; // EL91x0 clamps 1 / 5: not used
@@ -170,6 +174,11 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
       });
       // EK1914: no Up clamp, its power contacts carry Us
       if (d.coupler && d.pinout && !d.pinout.some((q) => q?.r === "up24") && pc24) { links.push([`us24:${uid}`, pc24]); links.push([`us0:${uid}`, pc0]); }
+      // CX2100 wired: the CX20xx it powers is no longer assumed on an external supply
+      if (d.cxk === "psu" && head && powerPins[head] && (isWired(uid, idx(pts, "24V")) || isWired(uid, idx(pts, "0V")))) {
+        powerPins[head].assumed = false;
+        for (let k = fixed.length - 1; k >= 0; k--) if (fixed[k].ext && (fixed[k].node === `us24:${head}` || fixed[k].node === `us0:${head}`)) fixed.splice(k, 1);
+      }
       if (d.tsFeed && pc24) links.push([`ch:${uid}:${d.pinout.findIndex((q) => q?.r === "do") + 1}`, pc24]);
       if (d.coupler || d.cx) {
         const pin = (r, lb) => (d.pinout ? d.pinout.findIndex((q) => q?.r === r) : pts.findIndex((x) => x.label === lb));

@@ -456,6 +456,51 @@ const C24 = {
   "ED6001-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"]], ports: [["dsub", 142, "X1"]], female: true, sub: "RS232" },
   "ED6002-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"], ["Ch2 Rx/Tx/Err", "gr"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], female: true, sub: "RS232" },
 };
+// Embedded PCs (board 07, product pictures): where the connectors sit on
+// each CX face, shared by pointGeom (ports) and CxM7Face (drawing). cxk:
+// c7 CX70xx (16-point I/O block), c8 CX80xx / 81xx / 82xx, pc CX9020 /
+// CX9240 / CX5xxx, c20 CX20xx (no block, a CX2100 powers it), psu CX2100,
+// mod CX2500 / CX2550 (system bus, left of the CPU)
+function cxLayout(d, W) {
+  const k = d.cxk, P = [];
+  const port = (kind, x, y, label, female) => P.push({ kind, x, y, label, female });
+  const dsubF = d.bus === "dsubF";
+  if (k === "c7") {
+    const lw = W - 53 - 68, x = lw / 2;
+    if (d.bus === "sw") { port("rj45", x, 62, "X001"); port("rj45", x, 146, "X101"); port("rj45", x, 214, "X102"); }
+    else {
+      if (d.usb) port("usb", x, 34, "X002");
+      port("rj45", x, 84, "X001");
+      if (d.bus) port("dsub", x, 196, "X101", dsubF);
+    }
+    return { P, lw };
+  }
+  if (k === "c8") {
+    const lw = Math.round((W - 53) * 0.42), x = lw / 2;
+    let y = 56;
+    if (d.usb) { port("usb", x, 32, "X002"); y = 84; }
+    port("rj45", x, y, "X001");
+    if (d.bus === "ecat" || d.bus === "sw") { port("rj45", x, y + 74, "X101"); port("rj45", x, y + 136, "X102"); }
+    else if (d.bus) port("dsub", x, y + 104, "X101", dsubF);
+    return { P, lw };
+  }
+  if (k === "pc" || k === "c20") {
+    port("rj45", 36, 70, "X000"); port("rj45", 36, 124, "X001");
+    [0, 1, 2, 3].forEach((i) => port("usb", 88 + (i >> 1) * 28, 64 + (i & 1) * 56, `X10${i}`));
+    port(d.disp, 112, 228, "X200");
+    return { P, lw: 152 };
+  }
+  if (k === "mod") {
+    const ps = d.mports || [];
+    ps.forEach(([kind, lab], i) => {
+      if (kind.startsWith("dsub")) port("dsub", W / 2, 200, lab, kind === "dsubF");
+      else port(kind, W / 2, (kind === "usb" ? 104 : 120) + i * (kind === "usb" ? 46 : 64), lab);
+    });
+    return { P, lw: W };
+  }
+  return { P, lw: W - 53 };
+}
+
 function pointGeom(d) {
   const W = Math.round(d.w * PX_PER_MM);
   const pts = [];
@@ -551,11 +596,22 @@ function pointGeom(d) {
     }
     return { W, pts, block: { bx, cols, gTop, gh } };
   }
-  if (d.cx) {
-    const labels = ["24V", "0V", "⏚", "⏚"];
-    labels.forEach((lb, i) => pts.push({ x: W - 26, y: 46 + i * 36, label: lb, size: 7.5, col: 1 }));
-    pts.push({ x: 32, y: 113.5, label: "X001", port: "rj45", size: 10 });
-    return { W, pts };
+  if (d.cxk) {
+    // embedded PCs (must mirror CxM7Face): the 12 mm block on the right —
+    // the CX70xx I/O block (Infosys pinout) or the coupler's power block —
+    // then the connectors from cxLayout
+    const k = d.cxk, blk = k !== "c20" && k !== "mod", bx = W - 53, c12 = [bx + 17, bx + 36];
+    if (k === "c7") {
+      for (let p = 0; p < 16; p++) {
+        const col = p < 8 ? 0 : 1;
+        pts.push({ x: c12[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2 });
+      }
+    } else if (blk) {
+      FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
+        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
+    }
+    cxLayout(d, W).P.forEach((q) => pts.push({ x: q.x, y: q.y, label: q.label, port: q.kind, size: q.kind === "usb" ? 7 : 10 }));
+    return { W, pts, block: { cplr: true, bx: blk ? bx : null, cols: c12, cxk: k } };
   }
   if (d.psu) {
     ["L", "N", "\u23DA"].forEach((lb, i) => pts.push({ x: W * 0.25 + i * W * 0.25, y: 78, label: lb, size: 7.5, col: i > 0 ? 1 : 0 }));
@@ -933,8 +989,12 @@ function pointRole(d, p) {
   if (p.tip) return p.tip;
   if (p.port) {
     if (p.port === "fo") return `${lb} — fiber optic port`;
-    if (p.port === "dsub") return `${lb} — D-sub 9 ${C24[d.id]?.female ? "socket" : "plug"} (${C24[d.id]?.sub || "fieldbus"})`;
+    if (p.port === "dsub") return d.cxk ? `${lb} — D-sub 9 (${d.busTxt || d.name.replace("CX Module ", "")})` : `${lb} — D-sub 9 ${C24[d.id]?.female ? "socket" : "plug"} (${C24[d.id]?.sub || "fieldbus"})`;
     if (p.port === "dnet") return `${lb} — DeviceNet 5-pin open-style plug`;
+    if (p.port === "usb") return `${lb} — USB port`;
+    if (p.port === "dvi") return `${lb} — DVI-D video output`;
+    if (p.port === "dp") return `${lb} — DisplayPort video output`;
+    if (d.cxk && p.port === "rj45") return d.bus === "ecat" && lb !== "X001" ? `${lb} — EtherCAT slave ${lb === "X101" ? "IN" : "OUT"} (RJ45)` : lb === "X001" || lb === "X000" ? `${lb} — Ethernet (TwinCAT / ADS; the EtherCAT master runs on the E-bus)` : `${lb} — Ethernet (RJ45${d.busTxt ? `, ${d.busTxt}` : ""})`;
     if (lb === "OUT") return "OUT — E-bus extension to next station (RJ45)";
     if (lb === "X1" && d.coupler) return "X1 IN — EtherCAT from master (RJ45)";
     if (lb === "X2" && d.coupler) return "X2 OUT — EtherCAT to next station (RJ45)";
@@ -965,10 +1025,10 @@ function pointRole(d, p) {
     if (q.r === "p24") return `${tag} — + power contact (24 V Up)`;
     if (q.r === "gnd") return `${tag} — ${q.t ? `${q.t}, on the − power contact` : "− power contact (GND Up)"}`;
   }
-  if (d.coupler && d.pinout) {
+  if ((d.coupler || d.cx) && d.pinout) {
     const q = d.pinout[Number(lb) - 1];
     if (!q) return `Pt ${lb} \u2014 not connected`;
-    if (q.r === "us24") return `Pt ${lb} \u2014 Us +24 V, coupler and E-bus supply`;
+    if (q.r === "us24") return `Pt ${lb} \u2014 Us +24 V, ${d.cx ? "CPU" : "coupler"} and E-bus supply`;
     if (q.r === "us0") return `Pt ${lb} \u2014 Us 0 V`;
     if (q.r === "up24") return `Pt ${lb} \u2014 Up +24 V, feeds the power contacts`;
     if (q.r === "up0") return `Pt ${lb} \u2014 Up 0 V, the \u2212 power contact`;
@@ -2633,7 +2693,7 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   if (!its.length) return null;
 
   const busY = y - 8;      // E-bus lane, just above the terminals
-  const pcY = y + 250;     // power-contact lane, just below the rail
+  const pcY = y + TH + 40; // power-contact lane, under the terminals (below the wire duct)
 
   // A rail may hold several separate stations, each closed by an end cover
   // (EL9011/EL9012) and set apart by a gap. Split at each end cover and draw
@@ -2666,7 +2726,7 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
               </>
             )}
             {groups.length > 0 && ebus && (
-              <text x={ebus.x0} y={pcY - 4} fill={C.muted} fontSize="7" fontWeight="700" style={{ letterSpacing: "0.5px" }}>POWER CONTACTS (Up)</text>
+              <text x={ebus.x0} y={pcY + 26} fill={C.muted} fontSize="7" fontWeight="700" style={{ letterSpacing: "0.5px" }}>POWER CONTACTS (Up)</text>
             )}
             {groups.map((gr, gi) => (
               <g key={gi}>
@@ -2742,6 +2802,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.extM7 ? <ExtensionFace d={d} W={W} sim={sim} /> :
         cplr && d.c24 ? <Comm24Face d={d} W={W} sim={sim} /> :
+        cplr && d.cxk ? <CxM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.jM7 ? <JunctionFace d={d} W={W} sim={sim} /> :
         d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
         d.psu ? <PsuFace d={d} W={W} sim={sim} /> :
@@ -2877,7 +2938,7 @@ const TS_Y = { push: "#E7B10E", pushEdge: "#B98A05", slot: "#6B500C", entry: "#D
 const TS_MODS = [345, 475, 605, 735, 865];
 function el12Tab(d, n) {
   if (d.safety) return TS_TABS[d.id]?.[n] || { hide: true };
-  if (d.coupler) return FEED_TAB[FEED_GROUPS[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
+  if (d.coupler || (d.cxk && !d.pinout)) return FEED_TAB[FEED_GROUPS[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
   if (FEED12[d.id]) {
     const lb = feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0];
     return { ...FEED_TAB[lb], ...FEED12[d.id].tabs?.[lb] };
@@ -3582,6 +3643,243 @@ function Comm24Face({ d, W, sim = null }) {
   );
 }
 
+/* --- Embedded PCs (board 07) ------------------------------------------ */
+// connector drawings as on the pictures: upright RJ45 (contacts on top,
+// green / yellow LEDs left), USB-A, DVI-D, DisplayPort, the X300 option plate
+function RjUp({ cx, cy, la = true }) {
+  return (
+    <g>
+      <rect x={cx - 15} y={cy - 13} width="30" height="26" rx="2" fill="#C9CDD1" stroke="#8E9398" strokeWidth="0.6" />
+      <rect x={cx - 11} y={cy - 9} width="22" height="16" rx="1" fill="#1E2023" />
+      <rect x={cx - 5} y={cy + 6} width="10" height="4" fill="#1E2023" />
+      {Array.from({ length: 8 }).map((_, i) => <rect key={i} x={cx - 8.6 + i * 2.4} y={cy - 9} width="1.2" height="5" fill="#D7B24A" />)}
+      <rect x={cx - 14} y={cy - 12} width="4" height="3" rx="0.5" fill={la ? "#46E36E" : "#4A4E52"} />
+      <rect x={cx - 14} y={cy + 9} width="4" height="3" rx="0.5" fill="#E8C21A" />
+    </g>
+  );
+}
+function UsbA({ cx, cy, vert = false, usb3 = false }) {
+  const w = vert ? 11 : 24, h = vert ? 24 : 11;
+  return (
+    <g>
+      <rect x={cx - w / 2} y={cy - h / 2} width={w} height={h} rx="1" fill="#B9BEC3" stroke="#7E8388" strokeWidth="0.6" />
+      <rect x={cx - w / 2 + 1.6} y={cy - h / 2 + 1.6} width={w - 3.2} height={h - 3.2} fill="#1E2023" />
+      {vert
+        ? <rect x={cx - 1} y={cy - h / 2 + 3} width="3.2" height={h - 6} fill={usb3 ? "#2F6FD6" : "#DADDE0"} />
+        : <rect x={cx - w / 2 + 3} y={cy - 2.2} width={w - 6} height="3.2" fill={usb3 ? "#2F6FD6" : "#DADDE0"} />}
+    </g>
+  );
+}
+function DviPort({ cx, cy }) {
+  return (
+    <g>
+      {[-34, 34].map((dy) => <circle key={dy} cx={cx} cy={cy + dy} r="3.6" fill="#B2B7BC" stroke="#7E8388" strokeWidth="0.5" />)}
+      <path d={`M${cx - 10} ${cy - 27} H${cx + 10} V${cy + 23} L${cx + 6} ${cy + 27} H${cx - 6} L${cx - 10} ${cy + 23} Z`} fill="#C9CDD1" stroke="#7E8388" strokeWidth="0.6" />
+      <rect x={cx - 7} y={cy - 23} width="14" height="46" rx="1" fill="#E9E4D0" stroke="#8C8670" strokeWidth="0.4" />
+      {Array.from({ length: 24 }).map((_, i) => <rect key={i} x={cx - 5 + (i % 3) * 4} y={cy - 20 + Math.floor(i / 3) * 4.6} width="2" height="2.4" fill="#2E3134" />)}
+    </g>
+  );
+}
+function DpPort({ cx, cy }) {
+  return (
+    <g>
+      <path d={`M${cx - 7} ${cy - 15} H${cx + 7} V${cy + 15} H${cx - 3} L${cx - 7} ${cy + 11} Z`} fill="#B9BEC3" stroke="#7E8388" strokeWidth="0.6" />
+      <rect x={cx - 4} y={cy - 12} width="8" height="23" rx="0.8" fill="#1E2023" />
+      <rect x={cx - 0.8} y={cy - 10} width="2.4" height="19" fill="#D7B24A" />
+    </g>
+  );
+}
+function OptionPlate({ cx, cy, label }) {
+  return (
+    <g>
+      <rect x={cx - 15} y={cy - 36} width="30" height="72" rx="2" fill="#D3D6D9" stroke="#9EA3A8" strokeWidth="0.6" />
+      {[-28, 28].map((dy) => <circle key={dy} cx={cx} cy={cy + dy} r="3.2" fill="#B2B7BC" stroke="#7E8388" strokeWidth="0.5" />)}
+      <text x={cx} y={cy + 2} fill="#7A8086" fontSize="5" fontFamily="system-ui" textAnchor="middle">{label}</text>
+    </g>
+  );
+}
+function CxM7Face({ d, W, geom, sim = null }) {
+  const k = d.cxk, b = geom.block, bx = b.bx ?? W, L = cxLayout(d, W), lw = L.lw;
+  const us = sim ? !!sim.us : true, la = sim ? !!sim.alive || !!sim.us : true;
+  const tc = sim ? (sim.plc === "RUN" ? "#46E36E" : sim.plc === "FAULT" ? "#FF3B30" : null) : "#46E36E";
+  const ledCol = (n) => (n === "PWR" ? (us ? "#46E36E" : null) : n === "TC" ? tc : /^(EC Run|PN|MS|FB1)$/.test(n) && sim?.plc === "RUN" ? "#46E36E" : null);
+  const T = (x, y, t, o = {}) => <text x={x} y={y} fill={o.c || "#3A3F44"} fontSize={o.fs || 5.4} fontWeight={o.fw || 500} fontFamily={o.mono ? "ui-monospace,monospace" : "system-ui"} textAnchor={o.a || "start"}>{t}</text>;
+  const leds = (x, y0, pitch = 13, dark = false) => (d.leds || []).map((n, i) => (
+    <g key={n}>
+      <rect x={x} y={y0 + i * pitch} width="9" height="7" rx="1" fill={ledCol(n) || (dark ? "#3E4246" : "#6A6F74")} stroke={dark ? "#1A1C1E" : "#4A4E52"} strokeWidth="0.4" />
+      {T(x + 12, y0 + i * pitch + 6, n, { c: dark ? "#E6E8EA" : "#3A3F44", fs: 5.6 })}
+    </g>
+  ));
+  const sc = (q) => (q.kind === "rj45" || q.kind === "usb" ? `translate(${q.x} ${q.y}) scale(1.35) translate(${-q.x} ${-q.y})` : undefined);
+  const ports = L.P.map((q, i) => (
+    <g key={i}>
+      <g transform={sc(q)}>
+      {q.kind === "rj45" && <RjUp cx={q.x} cy={q.y} la={la} />}
+      {q.kind === "usb" && <UsbA cx={q.x} cy={q.y} vert={k === "pc" || k === "c20"} usb3={/CX82|CX52|CX53|CX56|CX20|CX9240|CX2500-0070/.test(d.id)} />}
+      {q.kind === "dsub" && <DSub cx={q.x} cy={q.y} female={q.female} />}
+      {q.kind === "dvi" && <DviPort cx={q.x} cy={q.y} />}
+      {q.kind === "dp" && <DpPort cx={q.x} cy={q.y} />}
+      </g>
+      {k === "pc" || k === "c20"
+        ? T(q.x, q.kind === "usb" ? (q.label === "X100" || q.label === "X102" ? q.y - 20 : q.y + 25) : q.kind === "rj45" ? q.y + (q.label === "X000" ? -21 : 27) : q.y + 44, q.label, { fs: 4.6, a: "middle" })
+        : T(q.x + (q.kind === "dsub" ? 22 : 24), q.y + (q.kind === "dsub" ? 2 : 17), q.label, { fs: 4.8 })}
+    </g>
+  ));
+  const hd = Array.from({ length: 16 }, (_, s) => !!sim?.ch?.[s]);
+  const block = k === "c7"
+    ? <g transform={`translate(${bx} 0)`}><Hd16Face d={d} W={53} cols={[17, 36]} states={hd} print={false} /></g>
+    : bx < W ? <g transform={`translate(${bx} 0)`}><El12Face d={d} W={53} cols={[17, 36]} states={sim ? [us, !!sim.up, la, sim.run || false] : [true, false, true, true]} print={false} /></g> : null;
+  const redStripe = (x, w, id = true) => (
+    <g>
+      <rect x={x} y="0" width={w} height={TH} fill="#C8102E" />
+      {vprint(x + w / 2 + 3.5, TH - 10, "BECKHOFF", Math.min(10, w - 4), "#FFFFFF")}
+      {id && vprint(x + w / 2 + 3.5, 112, d.id, 6.4, "#FFFFFF", true)}
+    </g>
+  );
+  const body = (x, w, fill = "url(#cplrbody)") => <rect x={x} y="0" width={w} height={TH} fill={fill} stroke="#B9BDC1" strokeWidth="0.4" />;
+
+  if (k === "c7") {
+    return (
+      <g>
+        {body(0.5, lw)}
+        <rect x={lw} y="0" width="30" height={TH} fill="#2A2D30" />
+        {leds(lw + 4, 60, 14, true)}
+        <rect x={lw + 5} y="150" width="20" height="40" rx="1.5" fill="#1C1E20" stroke="#44484C" strokeWidth="0.6" />
+        {T(lw + 15, 202, "SD", { c: "#E6E8EA", fs: 6, fw: 700, a: "middle" })}
+        {redStripe(lw + 30, 16, false)}
+        {body(lw + 46, 22, "#EEF0F1")}
+        {vprint(lw + 61, 96, d.id, 9, "#2B2F33", true)}
+        {d.busTxt && T(lw / 2, TH - 14, d.busTxt, { fs: 6, fw: 700, a: "middle" })}
+        {ports}
+        {block}
+      </g>
+    );
+  }
+  if (k === "c8") {
+    const fx = lw + 58;
+    return (
+      <g>
+        {body(0.5, lw, "#ECEEEF")}
+        {body(lw, 58, "#F3F4F5")}
+        {T(lw + 6, 18, "BECKHOFF", { c: "#C8102E", fs: 8, fw: 800 })}
+        {T(lw + 6, 28, d.id, { fs: 6.4, fw: 700, mono: true })}
+        {leds(lw + 8, 40, 14)}
+        <rect x={fx} y="0" width={bx - fx} height={TH} fill="#26292C" />
+        {Array.from({ length: 26 }).map((_, i) => <rect key={i} x={fx + 2} y={8 + i * 12.4} width={bx - fx - 4} height="5" rx="1" fill="#3A3E42" />)}
+        {d.bus && d.bus.startsWith("dsub") && [0, 1].map((i) => (
+          <g key={i}>
+            <circle cx={lw / 2} cy={232 + i * 40} r="11" fill="#D9DCDF" stroke="#8E9398" strokeWidth="0.6" />
+            <circle cx={lw / 2} cy={232 + i * 40} r="6" fill="#3E4246" />
+            {T(lw / 2 + 20, 236 + i * 40, `S10${i + 1}`, { fs: 4.6 })}
+          </g>
+        ))}
+        {(d.bus === "sw" || d.bus === "ecat") && (
+          <g>
+            <rect x={lw / 2 - 10} y="248" width="20" height="56" rx="1" fill="#2E3134" />
+            {Array.from({ length: 10 }).map((_, i) => <rect key={i} x={lw / 2 - 2} y={251 + i * 5.2} width="8" height="3.2" fill="#E9EBED" />)}
+            {T(lw / 2 + 14, 300, "S101", { fs: 4.6 })}
+          </g>
+        )}
+        {d.busTxt && T(lw / 2, TH - 10, d.busTxt, { fs: 6, fw: 700, a: "middle" })}
+        {ports}
+        {block}
+      </g>
+    );
+  }
+  if (k === "pc" || k === "c20") {
+    const small = W - 53 < 330; // CX9020 / CX9240
+    const optX = 40, optY = 228;
+    const panel = (
+      <g>
+        {body(0.5, lw, "#E3E6E8")}
+        <OptionPlate cx={optX} cy={optY} label="X300" />
+        {T(optX, optY + 46, "option", { fs: 4.4, a: "middle" })}
+        {ports}
+      </g>
+    );
+    if (k === "c20") {
+      return (
+        <g>
+          {panel}
+          {body(lw, 26, "#F3F4F5")}
+          {T(lw + 3, 16, d.id, { fs: 6.6, fw: 700, mono: true })}
+          {leds(lw + 3, 30, 14)}
+          {redStripe(lw + 26, 14, false)}
+          {body(lw + 40, W - lw - 41, "#EEF0F1")}
+          <rect x={lw + 50} y="60" width="10" height="240" fill="#1E2023" />
+          <rect x={lw + 70} y="70" width={W - lw - 90} height="210" rx="2" fill="#F6F7F8" stroke="#C9CDD1" strokeWidth="0.6" />
+          <rect x={W - 30} y="60" width="10" height="240" fill="#1E2023" />
+        </g>
+      );
+    }
+    return (
+      <g>
+        {panel}
+        {body(lw, (small ? bx : bx - 24) - lw, "#F3F4F5")}
+        {small ? T(lw + 6, 22, d.id, { fs: 8, fw: 700, mono: true }) : null}
+        {leds(lw + 6, 40, 14)}
+        {small ? (
+          <g>
+            {[128, 214].map((y) => <rect key={y} x={lw + 10} y={y} width="30" height="74" rx="1.5" fill="#E6E8EA" stroke="#B9BDC1" strokeWidth="0.6" />)}
+            {[128, 214].map((y) => <rect key={y} x={lw + 22} y={y + 6} width="6" height="62" fill="#2E3134" />)}
+            {redStripe(bx - 22, 20, false)}
+          </g>
+        ) : (
+          <g>
+            <rect x={lw + 54} y="24" width={bx - 24 - lw - 62} height="286" rx="1" fill="#F8F9FA" stroke="#C9CDD1" strokeWidth="0.5" />
+            {Array.from({ length: 18 }).map((_, i) => <rect key={i} x={lw + 60} y={36 + i * 15} width={bx - 24 - lw - 74} height="7" fill="#26292C" />)}
+            {redStripe(bx - 24, 22)}
+          </g>
+        )}
+        {block}
+      </g>
+    );
+  }
+  if (k === "psu") {
+    const cx0 = bx / 2, sfx = d.id.split("-")[1];
+    return (
+      <g>
+        {body(0.5, bx)}
+        {T(bx - 22, 26, "CX2100", { fs: 10, fw: 700, mono: true, a: "end" })}
+        {vprint(bx - 10, 32, sfx, 5, "#C8102E", true)}
+        <circle cx={cx0} cy="74" r="17" fill="#D9DCDF" stroke="#8E9398" strokeWidth="0.8" />
+        <circle cx={cx0} cy="74" r="12" fill="#2E3134" />
+        {T(cx0, 76, "nav", { c: "#C9CCCF", fs: 5, a: "middle" })}
+        {T(cx0, 106, "enter", { fs: 5, a: "middle" })}
+        <rect x={cx0 - 13} y="110" width="26" height="5" rx="2.5" fill="#2E3134" />
+        <rect x={cx0 - 18} y="130" width="36" height="170" rx="1.5" fill="#1D2124" stroke="#8E9398" strokeWidth="0.6" />
+        {us && vprint(cx0 - 2, 290, "BECKHOFF CX2000", 6.4, "#E6E8EA", true)}
+        {us && vprint(cx0 + 9, 290, sim ? (sim.plc === "RUN" ? "TWINCAT PLC RUN" : "TWINCAT PLC STOP") : "TWINCAT PLC RUN", 6.4, "#E6E8EA", true)}
+        {/09[01]4$/.test(d.id) && T(14, 300, d.id.endsWith("0914") ? "UPS · ext. battery" : "UPS", { fs: 5.6, fw: 600 })}
+        {block}
+      </g>
+    );
+  }
+  // CX2500 / CX2550 module
+  const [base, sfx] = d.id.split("-");
+  return (
+    <g>
+      {body(0.5, W - 1)}
+      {T(W - 16, 24, base, { fs: 9, fw: 700, mono: true, a: "end" })}
+      {vprint(W - 6, 30, sfx, 4.8, "#C8102E", true)}
+      {d.mports?.some(([kd]) => kd.startsWith("dsub")) && (
+        <g>
+          {T(14, 46, "BF", { fs: 5 })}{T(40, 46, "FB1", { fs: 5 })}{T(14, 60, "DIA", { fs: 5 })}{T(40, 60, "FB2", { fs: 5 })}
+          {[0, 1].map((i) => <circle key={i} cx={W / 2} cy={92 + i * 40} r="10" fill="#D9DCDF" stroke="#8E9398" strokeWidth="0.6" />)}
+        </g>
+      )}
+      {!d.mports?.length && (
+        <g>
+          <rect x={W / 2 - 18} y="80" width="36" height="150" rx="2" fill="#E6E8EA" stroke="#B9BDC1" strokeWidth="0.6" />
+          <rect x={W / 2 - 4} y="90" width="8" height="130" fill="#2E3134" />
+        </g>
+      )}
+      {ports}
+      {T(W / 2, TH - 10, d.name.replace("CX Module ", "").replace("CX ", ""), { fs: 5, a: "middle" })}
+    </g>
+  );
+}
+
 function JunctionFace({ d, W, sim = null }) {
   const run = sim ? sim.run || false : true, la = sim ? !!sim.alive : true;
   return (
@@ -3998,6 +4296,7 @@ function TopologyModal({ rails, free, onClose }) {
           stray.push({ d, uid: inst.uid, ri, why: "no E-bus contacts" });
           continue;
         }
+        if (d.cxk === "mod") continue;      // CX2500 modules: system bus, left of the CPU
         if (d.coupler || d.cx) { flush(); head = true; } // a coupler heads its own station
         seg.push({ d, uid: inst.uid });
       }

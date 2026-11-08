@@ -16,7 +16,7 @@ export function classifyPoint(d, label) {
     if (label === "⏚") return "pe";
     return null;
   }
-  if (d.coupler && d.pinout) return pinRole(d, Number(label));    // EK18xx / EK1914 / EK1960
+  if ((d.coupler || d.cx) && d.pinout) return pinRole(d, Number(label)); // EK18xx / EK1914 / EK1960 / CX70xx
   if (d.feed && (label === "NC" || label === "B" || label === "X")) return null; // not used / free bridge
   if (d.feed && d.efuse && label[0] === "I") return null;          // EL922x switch inputs
   if (d.feed && d.efuse && label[0] === "O") return "do";          // EL922x protected outputs
@@ -25,15 +25,10 @@ export function classifyPoint(d, label) {
   if (d.feed && d.anyV) return label === "⏚" ? "pe" : null;         // EL9190: any voltage
   if (d.feed && d.ac) return label === "⏚" ? "pe" : "ac";
   if (d.feed && d.uOut && d.uOut !== 24 && label === "+") return null; // U0 output, not 24 V
-  if (d.coupler || d.feed) {
+  if (d.coupler || d.feed || d.cx || d.cxk === "psu") {
     if (label === "24V" || label === "+") return "p24";
     if (label === "0V" || label === "−") return "gnd";
     return "pe"; // ⏚
-  }
-  if (d.cx) {
-    if (label === "24V") return "p24";
-    if (label === "0V") return "gnd";
-    return "pe";
   }
   if (d.pins) {
     const p = d.pins[Number(label) - 1];
@@ -143,6 +138,16 @@ export function validateRails(rails, byId) {
     const items = rail.items.map((inst) => ({ inst, d: byId[inst.catId] })).filter((x) => x.d);
     if (!items.length) return;
 
+    // CX2500 / CX2550 modules mount left of a CX20xx / CX52x0 / CX53x0 / CX56x0
+    items.forEach((x, i) => {
+      if (x.d.cxk !== "mod") return;
+      let j = i + 1;
+      while (items[j]?.d.cxk === "mod") j++;
+      const cpu = items[j]?.d;
+      if (!cpu || !(cpu.cxk === "c20" || /^CX5[2-6]/.test(cpu.id)))
+        warn(ri, `${x.d.id} mounts directly left of a CX20xx, CX52x0, CX53x0 or CX56x0 CPU (or another CX2500 module)`);
+    });
+
     // A rail may carry several separate stations, split by an end cover and a
     // visible gap. Validate each segment as its own station.
     const segments = [];
@@ -157,12 +162,18 @@ export function validateRails(rails, byId) {
       const gwarn = (msg) => warn(ri, gp(msg));
 
       // ---- rail structure -----------------------------------------------
-      const ebusItems = segAll.filter((x) => !x.d.psu);
+      const ebusItems = segAll.filter((x) => !x.d.psu && x.d.cxk !== "mod");
       if (!ebusItems.length) return;
       const firstEbus = ebusItems[0];
       if (firstEbus && !(firstEbus.d.coupler || firstEbus.d.cx)) {
         gerr(`must start with a coupler or embedded PC — first device is ${firstEbus.d.id}. Devices stranded past an end cover are disconnected; move them into a station or start a new group with its own coupler.`);
       }
+      // CX20xx: the CX2100 to its right powers the CPU and the E-bus
+      if (firstEbus?.d.cxk === "c20" && ebusItems[1]?.d.cxk !== "psu")
+        gerr(`${firstEbus.d.id} needs a CX2100 power supply module directly to its right — it powers the CPU and the E-bus`);
+      ebusItems.forEach((x, i) => {
+        if (x.d.cxk === "psu" && ebusItems[i - 1]?.d.cxk !== "c20") gwarn(`${x.d.id} belongs directly right of a CX20xx CPU`);
+      });
       const extraCouplers = ebusItems.slice(1).filter((x) => x.d.coupler || x.d.cx);
       if (extraCouplers.length) {
         gwarn(`${extraCouplers.map((x) => x.d.id).join(", ")} mid-group — a coupler/embedded PC begins one station; separate stations with an end cover + gap`);

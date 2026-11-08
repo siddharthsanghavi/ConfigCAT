@@ -25,13 +25,16 @@ const PERF = {
 const ROWS = [
   // Beckhoff — TwinCAT 3. Embedded PCs master their own E-bus; IPCs master
   // EtherCAT from an Ethernet port into an EK1100.
-  ['tc-cx7000', 'Beckhoff CX7000 · TwinCAT 3', 'twincat', 'modest', 512 * KB, 10, ['CX7000', 'CX7080']],
-  ['tc-cx8190', 'Beckhoff CX8190 · TwinCAT 3', 'twincat', 'modest', 1 * MB, 10, ['CX8190', 'CX8110']],
+  ['tc-cx7000', 'Beckhoff CX7000 · TwinCAT 3', 'twincat', 'modest', 512 * KB, 10, ['CX7000', 'CX7031', 'CX7050', 'CX7051', 'CX7080']],
+  ['tc2-cx8000', 'Beckhoff CX80xx · TwinCAT 2', 'twincat', 'modest', 512 * KB, 10, ['CX8010', 'CX8030', 'CX8031', 'CX8050', 'CX8051', 'CX8080', 'CX8090', 'CX8091', 'CX8093', 'CX8095']],
+  ['tc-cx8190', 'Beckhoff CX8190 · TwinCAT 3', 'twincat', 'modest', 1 * MB, 10, ['CX8190', 'CX8110', 'CX8180', 'CX8191', 'CX7291', 'CX7293']],
+  ['tc-cx8200', 'Beckhoff CX82xx · TwinCAT 3', 'twincat', 'quick', 2 * MB, 5, ['CX8200', 'CX8210', 'CX8280', 'CX8290']],
   ['tc-cx9020', 'Beckhoff CX9020 · TwinCAT 3', 'twincat', 'quick', 2 * MB, 10, ['CX9020']],
   ['tc-cx9240', 'Beckhoff CX9240 · TwinCAT 3', 'twincat', 'quick', 4 * MB, 5, ['CX9240']],
   ['tc-cx5130', 'Beckhoff CX5130 · TwinCAT 3', 'twincat', 'fast', 12 * MB, 2, ['CX5130', 'CX5120']],
-  ['tc-cx5140', 'Beckhoff CX5140 · TwinCAT 3', 'twincat', 'fast', 16 * MB, 2, ['CX5140', 'CX5230']],
-  ['tc-cx2033', 'Beckhoff CX2033 · TwinCAT 3', 'twincat', 'ipc', 32 * MB, 1, ['CX2033', 'CX2020', 'CX2042', 'CX2062']],
+  ['tc-cx5140', 'Beckhoff CX5140 · TwinCAT 3', 'twincat', 'fast', 16 * MB, 2, ['CX5140', 'CX5230', 'CX5240']],
+  ['tc-cx5330', 'Beckhoff CX53x0 / CX56x0 · TwinCAT 3', 'twincat', 'fast', 16 * MB, 1, ['CX5330', 'CX5340', 'CX5620', 'CX5630']],
+  ['tc-cx2033', 'Beckhoff CX2033 · TwinCAT 3', 'twincat', 'ipc', 32 * MB, 1, ['CX2033', 'CX2043', 'CX2042', 'CX2062', 'CX2072']],
   ['tc-c6015', 'Beckhoff C6015 · TwinCAT 3', 'twincat', 'fast', 16 * MB, 2, ['C6015', 'C6017', 'C6025', 'C7015']],
   ['tc-c6030', 'Beckhoff C6030 · TwinCAT 3', 'twincat', 'ipc', 64 * MB, 1, ['C6030', 'C6027', 'C6032', 'C6040']],
   ['tc-c6920', 'Beckhoff C69xx cabinet IPC · TwinCAT 3', 'twincat', 'ipc', 64 * MB, 1, ['C6920', 'C6650', 'C6930', 'C6950']],
