@@ -397,9 +397,25 @@ right; the EK18xx carry the HD block (`Hd16Face`) with their Infosys pinouts
 built-in I/O is wireable and simulated. `RjJack` is the RJ45 turned 90° as on
 the pictures (contacts right on couplers, left on EK1110 / EK1122, LEDs on
 the latch side). EK1110 is 44 mm (Infosys) on `ExtensionFace`; EK1122 /
-EK1122-0080 on `JunctionFace`. EK1914 / EK1960 keep the old coupler face
-until the TwinSAFE family; EK1121 / EK1322 / EK1521 / EK1561 / EK1310 keep
-`RjTermFace` for now. Saved EK18xx wires move (8 feed points became 16).
+EK1122-0080 on `JunctionFace`. EK1121 / EK1322 / EK1521 / EK1561 / EK1310
+keep `RjTermFace` for now. Saved EK18xx wires move (8 feed points became 16).
+
+**TwinSAFE (board 05, confirmed):** pinouts, widths and E-bus currents from
+the Beckhoff TwinSAFE manuals (download.beckhoff.com, 2026); markers, tabs
+and LED positions from the product pictures. The parts take the approved
+faces in the yellow housing: EL1904 / EL2912 / EL6910 / EL6930 the EL face,
+EL1918 the HD face, EL2904 / EL2911 two EL halves at 24 mm (clamps 1–8
+left, 9–16 right), EK1914 the EK18xx coupler path with a yellow insert under
+its safe clamps (rows 6–8), EK1960 its own `CompactFace` at 230.5 mm (plugs
+X3–X9 as printed). New pinout roles: `clk` (a safe input's clock output,
+"Input x+", its own 24 V source in the simulator), `usup` (EK1960 Up1–Up6,
+the supply of four outputs each), `link` (a second clamp of the same signal).
+The EL2911 safe output drives the + power contact after it (`tsFeed`).
+Validation flags clock outputs on 0 V / +24 V / outputs. Saved projects:
+EL2904 / EL2911 grow from 12 to 24 mm and EK1960 from 44 to 230.5 mm, which
+moves later parts; EL1918 now has 16 points; the EK1914 and EK1960 gain
+their clamps. The EL2911 was catalogued as a potential supply; the manual
+says 4 safe inputs + a 10 A safe output with TwinSAFE Logic.
 
 **ED series:** ED1008 / ED1859 faces confirmed and ported (`d.ed`,
 `EdFace`): Data Matrix code, marker labels coloured by signal type
@@ -430,7 +446,7 @@ in the catalog (12 mm, 8- and 16-point, from beckhoff.com). Still to add:
 | 2 | HD 16-point EL | 14 | EL1809, EL1819, EL2809, EL1889 |
 | 3 | Feed, distribution, end covers (EL9) | 34 | EL9100, EL9410, EL9150, EL9187, EL9011 |
 | 4 | Couplers and junctions | 26 | EK1100, EK1101-0010, EK1501, EK1110, EK1122 |
-| 5 | TwinSAFE | 7 | EL1904, EL2904, EL6910, EL1918, EL2911 |
+| 5 | TwinSAFE | 9 | EL1904, EL2904, EL6910, EL1918, EK1914, EK1960 |
 | 6 | Wide and special EL | 2 + connector faces | EL6614, EL7222 |
 | 7 | Embedded PCs (CX) | 12 | CX7000, CX8190, CX9020, CX5140, CX2033 |
 | 8 | Power supplies | 8 | PS1011-2410, PS2001-4810, PS3021-2440 |

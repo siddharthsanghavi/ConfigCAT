@@ -52,8 +52,10 @@ const CELL_WIRES = [
   [["u22", "1"], ["f7", "R"]],           // digital outputs -> stack light
   [["u22", "2"], ["f7", "Y"]],
   [["u22", "3"], ["f7", "G"]],
-  [["f6", "11"], ["u8", "1"]],           // e-stop -> TwinSAFE input
-  [["f6", "21"], ["u8", "2"]],
+  [["u8", "1"], ["f6", "11"]],           // e-stop: EL1904 clock out 1 -> NC 11-12 -> safe input 1
+  [["f6", "12"], ["u8", "2"]],
+  [["u8", "5"], ["f6", "21"]],           //   clock out 2 -> NC 21-22 -> safe input 2
+  [["f6", "22"], ["u8", "6"]],
 ];
 
 // ---- topology: every rule the network view knows ---------------------------------
@@ -230,7 +232,7 @@ export const SCENES = [
       { press: "Projects" },                // save the wired cell through the real dialog,
       { press: "Save current" },            // then reopen it to show the library
       { press: "Projects" },
-      { expect: { text: "15 wire(s)" } },
+      { expect: { text: `${CELL_WIRES.length} wire(s)` } },
       { shot: { name: "projects", region: "modal",
         caption: "Named projects saved in the browser, plus JSON save and import" } },
     ],

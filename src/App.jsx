@@ -432,7 +432,21 @@ function pointGeom(d) {
   const pts = [];
   if (d.endcap) return { W, pts, block: { cap: true } };
   if (d.sep) return { W, pts, block: { sep: true } };
-  if (d.blank || (d.fn === "saf" && !d.io && !d.feed)) return { W, pts };
+  if (d.blank) return { W, pts };
+  // TwinSAFE Logic (EL6910 / EL6930): eight clamps, all "not used, no function"
+  if (d.fn === "saf" && !d.io) return { W, pts, block: { cols: [W * 0.32, W * 0.68], el12: true, logic: true } };
+  // EK1960 compact controller (must mirror CompactFace): plugs X3 / X4 /
+  // X5–X9 in pinout order, then the two RJ45 jacks
+  if (d.compact) {
+    const add = (x, y, i) => pts.push({ x, y, label: String(i + 1), size: 5, round: true, plug: true });
+    let i = 0;
+    for (let k = 0; k < 4; k++) add(44, 278 + 12 * k, i++);
+    for (let k = 0; k < 10; k++) add(278, 154.75 + 17.5 * k, i++);
+    for (const mx of TS_MODS) for (let k = 0; k < 10; k++) add(mx + 66, 204.2 + 12.4 * k, i++);
+    pts.push({ x: 46, y: 46, label: "X1", port: "rj45", size: 10 });
+    pts.push({ x: 46, y: 102, label: "X2", port: "rj45", size: 10 });
+    return { W, pts, block: { compact: true } };
+  }
   // M7 coupler family (board 04): EK1110 mirrored (12 mm strip left, RJ45
   // housing right), 24 mm RJ45 junctions, couplers with the EL / HD block
   if (d.extM7) {
@@ -443,12 +457,13 @@ function pointGeom(d) {
     [124, 214].forEach((y, i) => pts.push({ x: 44, y, label: `X${i + 1}`, port: "rj45", size: 10 }));
     return { W, pts, block: { cplr: true, bx: null } };
   }
-  if (d.coupler && !d.safety) {
+  if (d.coupler && (!d.safety || d.ek18)) {
     const bx = W - 53, c12 = [bx + 53 * 0.32, bx + 53 * 0.68];
     if (d.ek18) {
       for (let p = 0; p < 16; p++) {
         const col = p < 8 ? 0 : 1;
-        pts.push({ x: c12[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2 });
+        // EK1914: rows 6-8 are the safe I/O in a yellow insert
+        pts.push({ x: c12[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2, ys: !!d.safety && p % 8 >= 5 });
       }
     } else {
       FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
@@ -548,7 +563,7 @@ function pointGeom(d) {
     const c16 = [W * 0.32, W * 0.68];
     for (let p = 0; p < 16; p++) {
       const col = p < 8 ? 0 : 1;
-      pts.push({ x: c16[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2 });
+      pts.push({ x: c16[col], y: HD16.rows[p % 8], label: String(p + 1), size: 5.2, col, round: true, r: 5.2, ys: !!d.safety });
     }
     return { W, pts, block: { cols: c16, hd16: true } };
   }
@@ -560,12 +575,22 @@ function pointGeom(d) {
     }
     return { W, pts, block: { cols, top, bot, rows, hd } };
   }
+  // TwinSAFE 24 mm (EL2904 / EL2911): two 12 mm halves, clamps 1-8 left,
+  // 9-16 right (the manuals' 1'-8')
+  if (d.safety && d.w === 24) {
+    const c4 = [17, 36, 70, 89];
+    for (let p = 0; p < 16; p++) {
+      const col = Math.floor(p / 4), row = p % 4;
+      pts.push({ x: c4[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true, ys: true });
+    }
+    return { W, pts, block: { cols: c4, gTop: EL12.gTop, gh: EL12.gh, el12: true, el24: true } };
+  }
   // 12 mm EL terminals: the redrawn face (must mirror El12Face)
-  if ((d.pins || !d.dist) && !d.safety && d.w === 12) {
+  if ((d.pins || !d.dist) && d.w === 12) {
     const c12 = [W * 0.32, W * 0.68];
     for (let p = 0; p < 8; p++) {
       const col = p < 4 ? 0 : 1, row = p % 4;
-      pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true });
+      pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: String(p + 1), size: 6.2, col, round: true, ys: !!d.safety });
     }
     return { W, pts, block: { cols: c12, gTop: EL12.gTop, gh: EL12.gh, el12: true } };
   }
@@ -866,6 +891,24 @@ function pointRole(d, p) {
     if (lb === "\u23DA") return "PE \u2014 protective earth";
     if (lb === "+") return "+24 V DC output (supply source)";
     return "0 V DC output (supply return)";
+  }
+  if (d.safety && d.pinout) {
+    // TwinSAFE (Beckhoff manuals): EK1960 clamps go by their printed name
+    const n = Number(lb), q = d.pinout[n - 1];
+    const tag = q?.t && d.compact ? `${q.t}` : `Pt ${lb}`;
+    if (!q || (!q.r && !q.rel)) return `${tag} — not used, no function`;
+    if (q.rel) return `${tag} — relay ${q.rel} make contact, ${q.io === "in" ? "input" : "output"} side (relay option, not simulated)`;
+    if (q.r === "clk") return `${tag} — Input ${q.ch}+ · clock output (test pulses) for safe input ${q.ch}`;
+    if (q.r === "di") return `${tag} — ${q.safe || !d.coupler || d.compact ? "safe " : "standard "}input ${q.ch}${d.coupler ? "" : ` (Input ${q.ch}−)`}`;
+    if (q.r === "do") return `${tag} — ${q.t && !d.compact ? q.t : `${q.safe || !d.coupler || d.compact ? "safe " : "standard "}output ${q.ch}`}${q.sup ? ` from Up${q.sup.slice(1)}` : ""}`;
+    if (q.r === "usup") return `${tag} — Up${q.k.slice(1)} +24 V, supply of its four outputs`;
+    if (q.r === "link") return `${tag} — ${q.t || `same signal as Pt ${q.to}`}`;
+    if (q.r === "us24") return `${tag} — Us +24 V, ${d.compact ? "internal logic and E-bus" : "coupler, E-bus and the power contacts"}`;
+    if (q.r === "us0") return `${tag} — Us 0 V (GND)`;
+    if (q.r === "up24") return `${tag} — ${q.t || "Up +24 V"}`;
+    if (q.r === "up0") return `${tag} — ${q.t || "Up 0 V (GND)"}`;
+    if (q.r === "p24") return `${tag} — + power contact (24 V Up)`;
+    if (q.r === "gnd") return `${tag} — ${q.t ? `${q.t}, on the − power contact` : "− power contact (GND Up)"}`;
   }
   if (d.coupler && d.pinout) {
     const q = d.pinout[Number(lb) - 1];
@@ -2585,12 +2628,15 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const { d, geom } = t;
   const W = geom.W;
   const uid = inst.uid;
-  const body = d.psu ? "url(#psbody)" : d.safety ? "url(#ybody)" : "url(#tbody)";
+  // TwinSAFE housings are yellow, except the EK1914 (grey, a yellow insert under its safe clamps)
+  const body = d.psu ? "url(#psbody)" : d.safety && !(d.coupler && !d.compact) ? "url(#ybody)" : "url(#tbody)";
   const hd16 = !!geom.block?.hd16, ed = !!geom.block?.ed;
   const cap = !!geom.block?.cap; // EL9011 / EL9012 end cover
   const sep = !!geom.block?.sep; // EL9080 separation terminal
   const cplr = geom.block?.cplr ? geom.block : null; // M7 coupler / extension / junction
-  const el12 = !!geom.block?.el12 || hd16 || ed || cap || sep || !!cplr; // the M7 12 mm housing
+  const compact = !!geom.block?.compact; // EK1960
+  const el12 = !!geom.block?.el12 || hd16 || ed || cap || sep || !!cplr || compact; // the M7 12 mm housing
+  const yHooks = d.safety && (!d.coupler || compact); // TwinSAFE latch hooks are yellow
   const blockRight = !cplr || cplr.bx === W - 53; // E-bus springs and release tab on the right
 
   return (
@@ -2620,8 +2666,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         const x0 = cplr ? cplr.bx : 0, w = cplr ? 53 : W;
         return (
           <g key={y}>
-            <rect x={x0 + 3} y={y} width={w - 6} height="9" rx="1" fill="#F3F4F5" stroke="#A9ADB1" strokeWidth="0.5" />
-            <rect x={x0 + Math.min(9, w / 2 - 4)} y={y + 2.7} width={Math.max(8, w - 18)} height="3.6" rx="0.6" fill="#C5C9CC" />
+            <rect x={x0 + 3} y={y} width={w - 6} height="9" rx="1" fill={yHooks ? "#F2C414" : "#F3F4F5"} stroke={yHooks ? "#C99A00" : "#A9ADB1"} strokeWidth="0.5" />
+            <rect x={x0 + Math.min(9, w / 2 - 4)} y={y + 2.7} width={Math.max(8, w - 18)} height="3.6" rx="0.6" fill={yHooks ? "#D9A90A" : "#C5C9CC"} />
           </g>
         );
       })}
@@ -2633,7 +2679,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {/* silver rail-latch nub near rail line */}
       {!el12 && <rect x="-1.2" y={190} width="3" height="12" rx="1.2" fill="#C9CDD2" stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />}
 
-      {d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
+      {compact ? <CompactFace d={d} W={W} sim={sim} /> :
+        d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.extM7 ? <ExtensionFace d={d} W={W} sim={sim} /> :
         cplr && d.jM7 ? <JunctionFace d={d} W={W} sim={sim} /> :
         d.coupler ? <CouplerFace d={d} W={W} uid={uid} sim={sim} /> :
@@ -2670,8 +2717,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         if (p.round) {
           return (
             <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
-              {p.sq ? <PushIn x={p.x} y={p.y} hl={isPending} /> : <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} />}
-              <rect x={p.x - (p.sq ? 8 : p.r ? 7.5 : 9.5)} y={p.y - (p.sq ? 18.5 : p.r ? 15.5 : 27)} width={p.sq ? 16 : p.r ? 15 : 19} height={p.sq ? 26 : p.r ? 22 : 36} fill="transparent">
+              {p.sq ? <PushIn x={p.x} y={p.y} hl={isPending} /> : p.plug ? <PlugHole x={p.x} y={p.y} hl={isPending} /> : <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} ys={p.ys} />}
+              <rect x={p.x - (p.plug ? 7 : p.sq ? 8 : p.r ? 7.5 : 9.5)} y={p.y - (p.plug ? 5.5 : p.sq ? 18.5 : p.r ? 15.5 : 27)} width={p.plug ? 22 : p.sq ? 16 : p.r ? 15 : 19} height={p.plug ? 11 : p.sq ? 26 : p.r ? 22 : 36} fill="transparent">
                 <title>{pointRole(d, p)}</title>
               </rect>
             </g>
@@ -2695,8 +2742,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
             <rect key={i} x={W - 1.4} y={hd16 ? 38 + i * 11 : 29 + i * 14} width="2.6" height={hd16 ? 5 : 6} rx="0.6" fill="#CDD0D3" stroke="#979B9F" strokeWidth="0.4" />
           ))}
           {!sep && blockRight && <rect x={W - 2} y={hd16 || ed ? 206 : 208} width="4.2" height={hd16 ? 22 : 30} rx="1.6" fill={ed ? "#EE7A3C" : "#F0961C"} stroke={ed ? "#B9561F" : "#BF730E"} strokeWidth="0.5" />}
-          {(sep || cplr ? [] : ed ? [168, 232] : hd16 ? [179, 241] : d.noPE ? [179, 246] : [179, 246, 310]).map((y) => (
-            <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill="#9A9EA2" />
+          {(sep || cplr || compact ? [] : ed ? [168, 232] : hd16 ? [179, 241] : d.noPE ? [179, 246] : [179, 246, 310]).map((y) => (
+            <rect key={y} x="-0.9" y={y} width="2.4" height="8" rx="0.5" fill={d.safety ? "#B08304" : "#9A9EA2"} />
           ))}
         </g>
       )}
@@ -2728,7 +2775,7 @@ const ledChannel = (slot, d) => {
 const SIGNAL_ROLES = ["di", "do", "ai", "ao"];
 const channelPoint = (d, c) => {
   if (!d.pinout) return c;
-  const i = d.pinout.findIndex((p) => p.ch === c + 1 && SIGNAL_ROLES.includes(p.r));
+  const i = d.pinout.findIndex((p) => p?.ch === c + 1 && SIGNAL_ROLES.includes(p.r));
   return i < 0 ? c : i;
 };
 
@@ -2752,7 +2799,24 @@ const FEED_TAB = {
   NC: { fill: "#A19D9A", edge: "#7E7A77", ink: "#A19D9A", text: "", fs: 6 },
 };
 const DIST_TAB = { p24: "+", up: "+", gnd: "−", un: "−", pe: "⏚" };
+// TwinSAFE tab texts as printed on the product pictures (EL1904 I1-I8 across
+// the rows, EL2904 O1-O8 on its right half, plain grey tabs elsewhere)
+const TS_OLIVE = (t) => ({ fill: "#B3B31C", edge: "#85860F", ink: "#2A2B10", text: t, fs: 6.4 });
+const TS_GREY = { fill: "#A8A4A1", edge: "#7E7A77", ink: "#A8A4A1", text: "", fs: 6 };
+const tsRows = (n0, pre) => Object.fromEntries([0, 1, 2, 3].flatMap((r) => [[n0 + r + 1, TS_OLIVE(`${pre}${r * 2 + 1}`)], [n0 + r + 5, TS_OLIVE(`${pre}${r * 2 + 2}`)]]));
+const tsGrey = (a, b) => Object.fromEntries(Array.from({ length: b - a + 1 }, (_, i) => [a + i, TS_GREY]));
+const TS_TABS = {
+  EL1904: tsRows(0, "I"),
+  EL2904: { ...tsGrey(1, 8), ...tsRows(8, "O") },
+  EL2911: tsGrey(1, 16),
+  EL2912: tsGrey(1, 8),
+};
+// yellow TwinSAFE housing parts
+const TS_Y = { push: "#E7B10E", pushEdge: "#B98A05", slot: "#6B500C", entry: "#DDA70A", entryEdge: "#B08304", hole: "#3B2E0E", num: "#5E4A08", win: "#D8C21A", winEdge: "#A8960C" };
+// EK1960 I/O module left edges (X5-X9), shared by pointGeom and CompactFace
+const TS_MODS = [345, 475, 605, 735, 865];
 function el12Tab(d, n) {
+  if (d.safety) return TS_TABS[d.id]?.[n] || { hide: true };
   if (d.coupler) return FEED_TAB[FEED_GROUPS[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
   if (FEED12[d.id]) {
     const lb = feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0];
@@ -2776,15 +2840,25 @@ function el12Tab(d, n) {
 }
 
 // round wire entry of a 12 mm EL clamp (the clickable wiring point)
-function RoundClamp({ x, y, hl, r }) {
+function RoundClamp({ x, y, hl, r, ys }) {
   const hd = !!r, R = r || 6.2;
   return (
     <g>
       {hl && (hd
         ? <rect x={x - 7.5} y={y - 15.5} width="15" height="22" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />
         : <rect x={x - 9.5} y={y - 27} width="19" height="36" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />)}
-      <circle cx={x} cy={y} r={R} fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
-      <circle cx={x} cy={y} r={R * 0.7} fill="#2E3134" />
+      <circle cx={x} cy={y} r={R} fill={ys ? TS_Y.entry : "#9EA2A6"} stroke={ys ? TS_Y.entryEdge : "#7C8084"} strokeWidth="0.5" />
+      <circle cx={x} cy={y} r={R * 0.7} fill={ys ? TS_Y.hole : "#2E3134"} />
+    </g>
+  );
+}
+
+// wire opening of a black spring plug (EK1960 X3-X9)
+function PlugHole({ x, y, hl }) {
+  return (
+    <g>
+      {hl && <rect x={x - 6.5} y={y - 6} width="21" height="12" rx="2" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
+      <circle cx={x} cy={y} r="4.4" fill="#0E1012" stroke="#4A4E52" strokeWidth="0.5" />
     </g>
   );
 }
@@ -2809,6 +2883,8 @@ const ED_MARK = { di: ["#EBC31E", "#B8941A"], do: ["#D8322E", "#9E1F1C"], ai: ["
 // approved EL yellow.
 const elMark = (d) => {
   if (d.coupler) return ["#C96E14", "#94500B"]; // couplers: orange
+  // TwinSAFE (product pictures): olive on safe inputs, red on safe outputs, grey on the logic
+  if (d.safety) return !d.io ? ["#A8A4A1", "#7E7A77"] : d.io === "di" ? ["#B9B81E", "#878710"] : ["#D3262B", "#9B191D"];
   const f = FEED12[d.id];
   if (f) return f.mark === "grey" ? ["#A8A4A1", "#7E7A77"] : ["#C96E14", "#94500B"]; // feeds: orange, EL9410 grey
   if (d.pins) return ["#A8A4A1", "#7E7A77"]; // distribution: grey
@@ -2886,12 +2962,14 @@ function pointChannelIdx(d, s) {
 // pointGeom's hd16 branch; LED n sits beside signal n, 1-8 left, 9-16 right.
 function Hd16Face({ d, W, cols, states, print = true }) {
   const beckhoff = print && (!d.brand || d.brand === "beckhoff");
+  const ysRow = (row) => !!d.safety && (!d.coupler || row >= 5);
   return (
     <g>
+      {d.safety && d.coupler && <rect x="1" y="251" width={W - 2} height={TH - 252} rx="1" fill="url(#ybody)" stroke="#C99A00" strokeWidth="0.5" />}
       {print && <text x={W / 2} y="9.2" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>}
       <rect x="4.5" y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W - 25} y="12" width="20.5" height="12" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
-      <rect x={W / 2 - 13.5} y="28" width="27" height="72" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x={W / 2 - 13.5} y="28" width="27" height="72" rx="1.5" fill={d.safety && !d.coupler ? TS_Y.win : "#C9CCCF"} stroke={d.safety && !d.coupler ? TS_Y.winEdge : "#999DA1"} strokeWidth="0.5" />
       <rect x={W / 2 - 11.5} y="30" width="23" height="68" rx="1" fill={d.pins ? "#4F5859" : "#2C2F32"} />
       {!d.pins && Array.from({ length: 16 }).map((_, s) => {
         const c = s < 8 ? 0 : 1, y = 32.5 + (s % 8) * 8.4, x = W / 2 - 10 + c * 11, on = states[s];
@@ -2907,9 +2985,9 @@ function Hd16Face({ d, W, cols, states, print = true }) {
       })}
       {HD16.rows.map((cy, row) => cols.map((cx, ci) => (
         <g key={`${row}-${ci}`}>
-          <rect x={cx - 6.5} y={cy - 14.5} width="13" height="8.5" rx="1" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
-          <rect x={cx - 4.5} y={cy - 12.5} width="9" height="4.5" rx="0.6" fill="#585C60" />
-          <text x={cx - 9} y={cy - 9} fill="#51565B" fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{ci * 8 + row + 1}</text>
+          <rect x={cx - 6.5} y={cy - 14.5} width="13" height="8.5" rx="1" fill={ysRow(row) ? TS_Y.push : "#B3B7BB"} stroke={ysRow(row) ? TS_Y.pushEdge : "#8C9094"} strokeWidth="0.5" />
+          <rect x={cx - 4.5} y={cy - 12.5} width="9" height="4.5" rx="0.6" fill={ysRow(row) ? TS_Y.slot : "#585C60"} />
+          <text x={cx - 9} y={cy - 9} fill={ysRow(row) ? TS_Y.num : "#51565B"} fontSize="4.2" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{ci * 8 + row + 1}</text>
         </g>
       )))}
       {beckhoff && <text x={W / 2} y="185.2" fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>}
@@ -2921,7 +2999,7 @@ function Hd16Face({ d, W, cols, states, print = true }) {
 // 12 mm EL terminal face (M7, confirmed on the EL1002 pilot). Geometry
 // mirrors pointGeom's el12 branch: rows at EL12.gTop + row·gh, each a tab,
 // a release button and the wire entry (drawn by TerminalG).
-function El12Face({ d, W, cols, states, print = true }) {
+function El12Face({ d, W, cols, states, print = true, n0 = 0 }) {
   const led = (on, x, y, key) => {
     const col = on === "red" ? "#FF3B30" : "#46E36E";
     return (
@@ -2946,19 +3024,19 @@ function El12Face({ d, W, cols, states, print = true }) {
       <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       {/* LED window: 4 rows × 2, slot s at row ⌊s/2⌋, column s mod 2 */}
-      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill={d.safety ? TS_Y.win : "#C9CCCF"} stroke={d.safety ? TS_Y.winEdge : "#999DA1"} strokeWidth="0.5" />
       <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
       {Array.from({ length: 8 }).map((_, s) => led(states[s] || false, cols[s % 2] - 7, 27.5 + Math.floor(s / 2) * 8.5, s))}
       {/* clamp rows */}
       {[0, 1].map((ci) => [0, 1, 2, 3].map((row) => {
-        const n = ci * 4 + row + 1, g = EL12.gTop + row * EL12.gh, cx = cols[ci], t = el12Tab(d, n);
+        const n = n0 + ci * 4 + row + 1, g = EL12.gTop + row * EL12.gh, cx = cols[ci], t = el12Tab(d, n), ys = !!d.safety;
         return (
           <g key={n}>
             {!t.hide && <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />}
             {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
-            <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
-            <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
-            <text x={cx - 8.2} y={g + 33.6} fill="#51565B" fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
+            <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill={ys ? TS_Y.push : "#B3B7BB"} stroke={ys ? TS_Y.pushEdge : "#8C9094"} strokeWidth="0.5" />
+            <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill={ys ? TS_Y.slot : "#585C60"} />
+            <text x={cx - 8.2} y={g + 33.6} fill={ys ? TS_Y.num : "#51565B"} fontSize="4.4" fontWeight="600" fontFamily="system-ui" textAnchor="middle">{n}</text>
           </g>
         );
       }))}
@@ -3000,6 +3078,28 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
       : k === "up" ? (sim ? !!sim.up : powered && fed(["+", "L"]))
       : k === "run" ? (sim ? !!sim.alive : powered) : false;
     return <El12Face d={d} W={W} cols={cols} states={FEED12[d.id].leds.map(lit)} />;
+  }
+  if (b.logic) {
+    // EL6910 / EL6930: the LEDs sit in the bottom two rows (Run green, the rest red diag)
+    const run = sim ? sim.run || false : powered;
+    return <El12Face d={d} W={W} cols={cols} states={[false, false, false, false, run, false, false, false]} />;
+  }
+  if (b.el24) {
+    // inputs light the left window in channel order, outputs the right one
+    const lit = (i) => (sim ? !!sim.ch?.[i] : powered && wiredPts.has(`${uid}:${i}`));
+    const sigs = (r) => (d.pinout || []).map((q, i) => ({ q, i })).filter((x) => x.q?.r === r).sort((a, b) => a.q.ch - b.q.ch);
+    let left, right = [];
+    if (d.io === "mix") {
+      left = sigs("di").map((x) => lit(x.i));
+      right = sigs("do").map((x) => lit(x.i));
+    } else left = ledStates.slice(0, 8);
+    return (
+      <g>
+        <rect x="52.6" y="4" width="0.8" height={TH - 8} fill="#000" opacity="0.08" />
+        <El12Face d={d} W={53} cols={[17, 36]} states={left} />
+        <g transform="translate(53 0)"><El12Face d={d} W={53} cols={[17, 36]} states={right} print={false} n0={8} /></g>
+      </g>
+    );
   }
   if (b.el12 && PIN_LEDS[d.id]) return <El12Face d={d} W={W} cols={cols} states={PIN_LEDS[d.id].map(() => (sim ? !!sim.up : powered))} />;
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
@@ -3081,8 +3181,8 @@ function RjJack({ cx, cy, contacts = "right", la = true, top = "#46E36E", bot = 
         <rect key={i} x="11" y={-14.6 + i * 4.2} width="8.5" height="1.5" rx="0.5" fill="#D7B24A" />
       ))}
       {/* LEDs: small window above the step, a larger lens below */}
-      <rect x="-21" y="-27" width="10" height="13" rx="1" fill="#8F959A" stroke="#6F757A" strokeWidth="0.5" />
-      <rect x="-15.5" y="-25.5" width="3.2" height="10" rx="0.6" fill={la ? top : "#4A4E52"} />
+      <rect x="-21" y="-27" width="10" height="12" rx="1" fill={la ? top : "#4A4E52"} stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />
+      <rect x="-20" y="-26" width="8" height="3" rx="0.6" fill="#fff" opacity="0.35" />
       <rect x="-21" y="15" width="10" height="12" rx="1" fill={bot} opacity={la ? 1 : 0.4} stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />
       <rect x="-20" y="16" width="8" height="3" rx="0.6" fill="#fff" opacity="0.35" />
     </g>
@@ -3109,6 +3209,110 @@ const vprint = (x, y, txt, fs, fill, mono = false) => (
   <text x={x} y={y} transform={`rotate(-90 ${x} ${y})`} fill={fill} fontSize={fs} fontWeight={mono ? 700 : 800}
     fontFamily={mono ? "ui-monospace,monospace" : "system-ui"} style={{ letterSpacing: mono ? "0" : "0.4px" }}>{txt}</text>
 );
+
+// EK1960 TwinSAFE compact controller (board 05): network / address module,
+// status strip, red brand band, then the relay module X4 and the I/O modules
+// X5-X9, each a black LED panel over a spring plug. Plug labels, LED names
+// and the pin order are the EK1960 manual's; wire openings are drawn by
+// TerminalG (pointGeom's compact branch).
+function CompactFace({ d, W, sim = null }) {
+  const alive = sim ? !!sim.alive : true;
+  const pins = d.pinout || [];
+  const G = "#46E36E", R = "#FF3B30", INK = "#E8EAEC";
+  const plug = (x, y0, n, pitch) => (
+    <g>
+      <rect x={x - 2} y={y0 - 4} width="34" height={n * pitch + 8} rx="2" fill="#26292C" stroke="#111315" strokeWidth="0.6" />
+      <rect x={x + 32} y={y0 + 6} width="5" height={n * pitch - 12} rx="1" fill="#3A3E42" />
+    </g>
+  );
+  const pusher = (x, cy, pitch, key) => <rect key={key} x={x + 18} y={cy - pitch * 0.36} width="9" height={pitch * 0.72} rx="1" fill="#E7E9EB" stroke="#9EA3A8" strokeWidth="0.4" />;
+  const pinTxt = (x, cy, t, key) => <text key={key} x={x} y={cy + 1.8} fill={TS_Y.num} fontSize="5" fontWeight="600" fontFamily="system-ui">{t}</text>;
+  const chLit = (i) => !!(sim?.ch?.[i]);
+  // module list: [x, width, plug name, first point, count, legend]
+  const mods = [[212, 133, "X4", 4, 10, "Relais"], ...TS_MODS.map((x, k) => [x, k === 4 ? W - x - 2 : 130, `X${5 + k}`, 14 + k * 10, 10, k % 2 ? "dig in" : "dig out"])];
+  const status = [["EC Link 1", alive], ["EC Run", alive], ["EC Err", false, R], ["EC Link 2", alive], ["S PLC", sim ? sim.run || false : true], ["FSoE", alive], ["Us", alive], ["GND"], ["Up", alive], ["GND"]];
+  return (
+    <g>
+      {/* network / address module */}
+      <rect x="108" y="0" width="1" height={TH} fill="#000" opacity="0.12" />
+      <text x="100" y="14" fill="#3A3F44" fontSize="5.4" fontWeight="600" fontFamily="system-ui" textAnchor="end">X1</text>
+      <text x="100" y="132" fill="#3A3F44" fontSize="5.4" fontWeight="600" fontFamily="system-ui" textAnchor="end">X2</text>
+      <g transform="translate(46 46) scale(0.78)"><RjJack cx={0} cy={0} la={alive} /></g>
+      <g transform="translate(46 102) scale(0.78)"><RjJack cx={0} cy={0} la={alive} /></g>
+      {[[164, "×256"], [202, "×16"], [238, "×1"]].map(([y, t]) => (
+        <g key={t}>
+          <circle cx="40" cy={y} r="11" fill="#E3B10C" stroke="#C99A00" strokeWidth="0.5" />
+          {Array.from({ length: 16 }).map((_, k) => <circle key={k} cx={40 + 14.5 * Math.cos(k * Math.PI / 8)} cy={y + 14.5 * Math.sin(k * Math.PI / 8)} r="0.7" fill="#3A3F44" />)}
+          <circle cx="40" cy={y} r="8" fill="#2B2E31" />
+          <rect x="39" y={y - 7} width="2" height="7" fill="#C9CCCF" />
+          <text x="58" y={y + 5} fill="#3A3F44" fontSize="5" fontFamily="system-ui">{t}</text>
+        </g>
+      ))}
+      {plug(36, 272, 4, 12)}
+      {[0, 1, 2, 3].map((k) => pusher(36, 278 + 12 * k, 12, `p${k}`))}
+      {[0, 1, 2, 3].map((k) => pinTxt(14, 278 + 12 * k, pins[k]?.t, `t${k}`))}
+      <text x="78" y="326" fill="#3A3F44" fontSize="5.4" fontWeight="600" fontFamily="system-ui">X3</text>
+      {/* status strip, serial label, red BECKHOFF band */}
+      <rect x="114" y="14" width="70" height="114" rx="2" fill="#151719" />
+      {status.map(([t, on, col = G], k) => {
+        const y = 24 + k * 10.2;
+        return (
+          <g key={k}>
+            {on === undefined
+              ? <rect x="120" y={y - 1.2} width="5" height="2.4" fill={INK} />
+              : <circle cx="122.5" cy={y} r="2.6" fill={on ? col : "#3A3E42"} />}
+            <text x="129" y={y + 2} fill={INK} fontSize="5.2" fontFamily="system-ui">{t}</text>
+          </g>
+        );
+      })}
+      <rect x="126" y="218" width="20" height="20" fill="#FFFFFF" stroke="#2B2F33" strokeWidth="0.6" />
+      {[[128, 220], [139, 220], [128, 231], [134, 226], [141, 232], [136, 221], [130, 228]].map(([x, y]) => <rect key={`${x}-${y}`} x={x} y={y} width="4" height="4" fill="#2B2F33" />)}
+      <text x="124" y="254" fill="#3A3F44" fontSize="5" fontFamily="system-ui">Serial No.</text>
+      <text x="124" y="262" fill="#3A3F44" fontSize="5" fontFamily="system-ui">date code</text>
+      <rect x="186" y="0" width="26" height={TH} fill="#D9262B" />
+      {vprint(203, TH - 8, "BECKHOFF", 11, "#FFFFFF")}
+      {vprint(209.5, 242, d.id, 5, "#FFE3E3", true)}
+      {/* relay and I/O modules */}
+      {mods.map(([x, w, name, i0, n, leg], k) => {
+        const relay = k === 0, pitch = relay ? 17.5 : 12.4, y0 = relay ? 146 : 198;
+        return (
+          <g key={name}>
+            <rect x={x} y="0" width="1" height={TH} fill="#000" opacity="0.12" />
+            <rect x={x + 6} y="14" width={w - 12} height="114" rx="2" fill="#151719" />
+            {k === 2 && <path d={`M${x + 6} 14 h${w - 40} l-40 114 h-${w - 52} z`} fill="#FFFFFF" opacity="0.08" />}
+            <text x={x + w - 12} y="24" fill={INK} fontSize="5.2" fontFamily="system-ui" textAnchor="end">{leg}</text>
+            {relay && <text x={x + w - 12} y="31" fill={INK} fontSize="5.2" fontFamily="system-ui" textAnchor="end">in/out</text>}
+            {(relay || leg === "dig out") && <text x={x + w - 12} y={23 + 5 * 10.4 + 2} fill={INK} fontSize="5.2" fontFamily="system-ui" textAnchor="end">{relay ? "Relais" : "dig out"}</text>}
+            {relay && <text x={x + w - 12} y={23 + 5 * 10.4 + 9} fill={INK} fontSize="5.2" fontFamily="system-ui" textAnchor="end">in/out</text>}
+            {Array.from({ length: n }).map((_, j) => {
+              const i = i0 + j, q = pins[i];
+              if (!q || q.t === "n.c.") return null;
+              // the LED panel lists the signals top to bottom (relay: 4.1-4.4, gap, 4.5-4.8)
+              const row = relay ? (j < 4 ? j : j - 1) : j, y = 23 + row * 10.4;
+              const up = q.r === "usup";
+              const on = up ? alive : relay ? false : chLit(i);
+              return (
+                <g key={j}>
+                  <text x={x + 38} y={y + 2} fill={INK} fontSize="5" fontFamily="system-ui" textAnchor="end">{q.t}</text>
+                  {relay && q.io === "out"
+                    ? <rect x={x + 43.5} y={y - 1.2} width="5" height="2.4" fill={INK} />
+                    : <circle cx={x + 46} cy={y} r="2.6" fill={on ? G : "#3A3E42"} />}
+                  {up && <text x={x + w - 12} y={y + 2} fill={INK} fontSize="5.2" fontFamily="system-ui" textAnchor="end">24V</text>}
+                </g>
+              );
+            })}
+            {plug(x + 58, y0, n, pitch)}
+            {Array.from({ length: n }).map((_, j) => {
+              const q = pins[i0 + j], cy = y0 + pitch * (j + 0.5);
+              return q && q.t !== "n.c." ? <g key={j}>{pusher(x + 58, cy, pitch)}{pinTxt(x + 30, cy, q.t)}</g> : null;
+            })}
+            <text x={x + w - 10} y="326" fill="#3A3F44" fontSize="5.4" fontWeight="600" fontFamily="system-ui" textAnchor="end">{name}</text>
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 
 function CouplerM7Face({ d, W, geom, sim = null }) {
   const b = geom.block, bx = b.bx, hx = (bx - 14) / 2;

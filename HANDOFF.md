@@ -74,7 +74,13 @@ npm run shots          # regenerate README screenshots (see below)
   `S+` / `S−` the EL9550 system supply (nodes `us24` / `us0`), `I1`…`O2` the
   EL922x switch inputs and protected outputs (`d.efuse`), `X` a clamp
   without a tab. `PIN_TABS` / `PIN_LEDS` dress `pins` parts (EL9570 / 9576).
-  Couplers (not EK1914 / EK1960) take the `cplr` block: `bx` is the 12 mm
+  TwinSAFE: `TS_TABS` / `TS_Y` dress the yellow faces; 24 mm safety parts
+  take the `el24` block (two `El12Face` halves, `n0` 8 on the right), the
+  logic terminals the `logic` block (no clamps used), EK1960 the `compact`
+  block (`CompactFace`, `TS_MODS`, black `PlugHole` points, labels from
+  `pinout[i].t`). Pinout roles `clk` / `usup` / `link` are handled in
+  `electrical.js`, `validate.js` (`pinRole`) and `pointRole`.
+  Couplers (EK1914 via `ek18`, not EK1960) take the `cplr` block: `bx` is the 12 mm
   block's left edge (W − 53), clamps keep the FEED_GROUPS order on the EL rows
   and the ports follow them; `d.ek18` puts 16 HD points there instead, wired
   through `d.pinout`. `extM7` (EK1110) and `jM7` (EK1122) use the same block

@@ -51,7 +51,7 @@ export function railPointRole(d, label) {
   if (!Number.isFinite(n)) return null;
   if (d.pinout) {
     const p = d.pinout[n - 1];
-    return p ? { r: p.r, ch: p.ch, n: d.io === "mix" ? n : p.ch } : null;
+    return p && p.r ? { r: p.r, ch: p.ch, n: d.io === "mix" ? n : p.ch, to: p.to } : null;
   }
   if (d.io && n <= d.ch) return { r: d.io, ch: n, n };
   return null;

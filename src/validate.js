@@ -16,11 +16,7 @@ export function classifyPoint(d, label) {
     if (label === "⏚") return "pe";
     return null;
   }
-  if (d.coupler && d.pinout) {                                     // EK18xx
-    const q = d.pinout[Number(label) - 1];
-    if (!q) return null;
-    return q.r === "us24" || q.r === "up24" ? "p24" : q.r === "us0" || q.r === "up0" ? "gnd" : q.r;
-  }
+  if (d.coupler && d.pinout) return pinRole(d, Number(label));    // EK18xx / EK1914 / EK1960
   if (d.feed && (label === "NC" || label === "B" || label === "X")) return null; // not used / free bridge
   if (d.feed && d.efuse && label[0] === "I") return null;          // EL922x switch inputs
   if (d.feed && d.efuse && label[0] === "O") return "do";          // EL922x protected outputs
@@ -46,14 +42,22 @@ export function classifyPoint(d, label) {
   if (d.dist) return d.dist === "24V" ? "p24" : "gnd";
   const n = Number(label);
   if (!Number.isFinite(n)) return null;
-  if (d.pinout) {
-    const p = d.pinout[n - 1];
-    return p ? p.r : null;
-  }
+  if (d.pinout) return pinRole(d, n);
   // no verified pinout — only classify all-signal cases we are sure about
   if (d.io === "di" && n <= d.ch && d.ch >= 8) return "di";
   if (d.io === "do" && !d.relay && n <= d.ch && d.ch >= 8) return "do";
   return null;
+}
+
+// wiring role of clamp n from a verified pinout: supplies collapse to p24 /
+// gnd, a TwinSAFE clock output stays "clk", a linked clamp takes its target's
+function pinRole(d, n) {
+  const q = d.pinout[n - 1];
+  if (!q || !q.r) return null;
+  if (q.r === "link") return pinRole(d, q.to);
+  if (q.r === "us24" || q.r === "up24" || q.r === "usup") return "p24";
+  if (q.r === "us0" || q.r === "up0") return "gnd";
+  return q.r;
 }
 
 // pairs of point roles that indicate a wiring fault
@@ -71,6 +75,13 @@ const WIRE_RULES = [
   { a: "pe", b: "gnd", level: "warn", msg: "protective earth tied to 0 V — grounding scheme should be intentional" },
   { a: "pe", b: "do", level: "error", msg: "protective earth tied to an output" },
   { a: "pe", b: "ac", level: "error", msg: "protective earth tied to AC line" },
+  // TwinSAFE clock outputs (test pulses that feed safe inputs)
+  { a: "clk", b: "gnd", level: "error", msg: "clock output wired to 0 V — short circuit" },
+  { a: "clk", b: "p24", level: "warn", msg: "clock output wired to +24 V — the safe input reports an external supply" },
+  { a: "clk", b: "do", level: "error", msg: "clock output wired to an output" },
+  { a: "clk", b: "clk", level: "warn", msg: "two clock outputs tied together — reported as a cross-circuit" },
+  { a: "clk", b: "pe", level: "error", msg: "clock output tied to protective earth" },
+  { a: "clk", b: "ac", level: "error", msg: "230 V AC wired to a clock output" },
   // analog roles (ai / ao / agnd from verified pinouts)
   { a: "ao", b: "ao", level: "warn", msg: "two analog outputs tied together" },
   { a: "ao", b: "p24", level: "error", msg: "+24 V forced into an analog output" },

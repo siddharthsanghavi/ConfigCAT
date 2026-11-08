@@ -6,7 +6,7 @@
       "file": "docs/images/hero.png",
       "width": 3360,
       "height": 2000,
-      "kb": 1154,
+      "kb": 1207,
       "caption": "A wired two-station cell: TwinSAFE group, EtherCAT chained through a servo drive, IP67 box and valve terminal"
     },
     {
@@ -14,7 +14,7 @@
       "file": "docs/images/wiring.png",
       "width": 2760,
       "height": 844,
-      "kb": 415,
+      "kb": 416,
       "caption": "Wire tool mid-connection — press two points and the right cable is chosen for you"
     },
     {
@@ -28,9 +28,9 @@
     {
       "scene": "diagram",
       "file": "docs/images/diagram.png",
-      "width": 3639,
-      "height": 1128,
-      "kb": 361,
+      "width": 3674,
+      "height": 1192,
+      "kb": 381,
       "caption": "Electrical connection diagram, exportable as PDF with a cable schedule"
     },
     {
@@ -38,7 +38,7 @@
       "file": "docs/images/simulate.png",
       "width": 3360,
       "height": 2520,
-      "kb": 1309,
+      "kb": 1370,
       "caption": "Simulate: a TwinCAT master runs the I/O check program; the sensor lights its input LED, the stack light follows the output"
     },
     {
@@ -72,14 +72,6 @@
       "height": 1032,
       "kb": 73,
       "caption": "Validation catches rail-structure and E-bus budget problems as you build, and says how to fix them"
-    },
-    {
-      "scene": "projects",
-      "file": "docs/images/projects.png",
-      "width": 1312,
-      "height": 694,
-      "kb": 113,
-      "caption": "Named projects saved in the browser, plus JSON save and import"
     },
     {
       "scene": "about",

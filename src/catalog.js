@@ -13,6 +13,30 @@
  */
 import { EXTRA } from "./catalog-extended.js";
 import { ETG } from "./catalog-etg.js";
+// TwinSAFE clamp roles (Beckhoff manuals, 2026): clk = the clock (test-pulse)
+// output that feeds a safe input's contact, "Input x+"; the safe input itself
+// is the "Input x−" clamp. usup = an output supply clamp (EK1960 Up1–Up6),
+// link = a second clamp of the same signal.
+const CLK = (ch) => ({ r: "clk", ch });
+const TS_IN4 = [CLK(1), { r: "di", ch: 1 }, CLK(3), { r: "di", ch: 3 }, CLK(2), { r: "di", ch: 2 }, CLK(4), { r: "di", ch: 4 }];
+const TS_IN8 = [CLK(1), { r: "di", ch: 1 }, CLK(3), { r: "di", ch: 3 }, CLK(5), { r: "di", ch: 5 }, CLK(7), { r: "di", ch: 7 },
+  CLK(2), { r: "di", ch: 2 }, CLK(4), { r: "di", ch: 4 }, CLK(6), { r: "di", ch: 6 }, CLK(8), { r: "di", ch: 8 }];
+const EK1960_PINS = (() => {
+  const p = [{ r: "us24", t: "Us" }, { r: "us0", t: "GND" }, { r: "up24", t: "Up" }, { r: "up0", t: "GND" }];
+  for (let k = 1; k <= 4; k++) p.push({ r: null, t: `4.${k}`, rel: k, io: "in" });
+  p.push({ r: null, t: "n.c." }, { r: null, t: "n.c." });
+  for (let k = 1; k <= 4; k++) p.push({ r: null, t: `4.${k + 4}`, rel: k, io: "out" });
+  const outs = (x, o) => {
+    for (let k = 0; k < 4; k++) p.push({ r: "do", ch: o + k, sup: `u${(x - 5) / 2 * 2 + 1}`, t: `${x}.${k + 1}` });
+    p.push({ r: "usup", k: `u${(x - 5) / 2 * 2 + 1}`, t: `Up${(x - 5) / 2 * 2 + 1}` });
+    for (let k = 0; k < 4; k++) p.push({ r: "do", ch: o + 4 + k, sup: `u${(x - 5) / 2 * 2 + 2}`, t: `${x}.${k + 5}` });
+    p.push({ r: "usup", k: `u${(x - 5) / 2 * 2 + 2}`, t: `Up${(x - 5) / 2 * 2 + 2}` });
+  };
+  const ins = (x, o) => { for (let k = 0; k < 10; k++) p.push({ r: "di", ch: o + k, t: `${x}.${k + 1}` }); };
+  outs(5, 1); ins(6, 1); outs(7, 9); ins(8, 11); outs(9, 17);
+  return p;
+})();
+
 export const CATALOG = [
   // --- Couplers & Embedded PCs ---
   { id: "EK1100", name: "EtherCAT Coupler",            fn: "cplr", io: null, ch: 0, w: 44, ebus: +2000, coupler: true, desc: "E-bus head station, X1 IN / X2 OUT, 5 V / 2 A E-bus" },
@@ -43,8 +67,8 @@ export const CATALOG = [
   { id: "EK1818", name: "Coupler + 8 DI / 4 DO",       fn: "cplr", io: "mix", ch: 12, w: 44, ebus: +2000, coupler: true, ek18: true, pinout: [{ r: "us24" }, { r: "di", ch: 1 }, { r: "di", ch: 3 }, { r: "di", ch: 5 }, { r: "di", ch: 7 }, { r: "up24" }, { r: "do", ch: 1 }, { r: "do", ch: 3 }, { r: "us0" }, { r: "di", ch: 2 }, { r: "di", ch: 4 }, { r: "di", ch: 6 }, { r: "di", ch: 8 }, { r: "up0" }, { r: "do", ch: 2 }, { r: "do", ch: 4 }], desc: "EK1100 + 8 DI / 4 DO 24 V, HD block (verified pinout)" },
   { id: "EK1828", name: "Coupler + 4 DI / 8 DO",       fn: "cplr", io: "mix", ch: 12, w: 44, ebus: +2000, coupler: true, ek18: true, pinout: [{ r: "us24" }, { r: "di", ch: 1 }, { r: "di", ch: 3 }, { r: "do", ch: 1 }, { r: "do", ch: 3 }, { r: "up24" }, { r: "do", ch: 5 }, { r: "do", ch: 7 }, { r: "us0" }, { r: "di", ch: 2 }, { r: "di", ch: 4 }, { r: "do", ch: 2 }, { r: "do", ch: 4 }, { r: "up0" }, { r: "do", ch: 6 }, { r: "do", ch: 8 }], desc: "EK1100 + 4 DI / 8 DO 24 V, HD block (verified pinout)" },
   { id: "EK1828-0010", name: "Coupler + 8 DO",         fn: "cplr", io: "mix", ch: 8, w: 44, ebus: +2000, coupler: true, ek18: true, pinout: [{ r: "us24" }, null, null, { r: "do", ch: 1 }, { r: "do", ch: 3 }, { r: "up24" }, { r: "do", ch: 5 }, { r: "do", ch: 7 }, { r: "us0" }, null, null, { r: "do", ch: 2 }, { r: "do", ch: 4 }, { r: "up0" }, { r: "do", ch: 6 }, { r: "do", ch: 8 }], desc: "EK1100 + 8 digital outputs 24 V, HD block (verified pinout)" },
-  { id: "EK1914", name: "Coupler + TwinSAFE I/O",      fn: "cplr", io: null, ch: 8, w: 44, ebus: +2000, coupler: true, safety: true, twinsafe: true, desc: "4 standard DI + 4 standard DO + 2 safe inputs + 2 safe outputs" },
-  { id: "EK1960", name: "TwinSAFE Compact Controller", fn: "cplr", io: null, ch: 0, w: 44, ebus: +2000, coupler: true, safety: true, twinsafe: true, tsLogic: true, desc: "TwinSAFE Logic, 20 safe inputs, 24 safe outputs (width approximate)" },
+  { id: "EK1914", name: "Coupler + TwinSAFE I/O",      fn: "cplr", io: "mix", ch: 12, w: 44, ebus: +500, coupler: true, ek18: true, safety: true, twinsafe: true, pinout: [{ r: "us24" }, { r: "di", ch: 1 }, { r: "di", ch: 3 }, { r: "do", ch: 1 }, { r: "do", ch: 3 }, CLK(5), { r: "di", ch: 5, safe: true }, { r: "do", ch: 5, safe: true }, { r: "us0" }, { r: "di", ch: 2 }, { r: "di", ch: 4 }, { r: "do", ch: 2 }, { r: "do", ch: 4 }, CLK(6), { r: "di", ch: 6, safe: true }, { r: "do", ch: 6, safe: true }], desc: "EtherCAT coupler with 4 standard DI + 4 standard DO and 2 safe inputs + 2 safe outputs (clamps 6–8 / 14–16); power contacts fed from Us, max. 4 A" },
+  { id: "EK1960", name: "TwinSAFE Compact Controller", fn: "cplr", io: "mix", ch: 44, w: 230.5, ebus: +500, coupler: true, compact: true, safety: true, twinsafe: true, tsLogic: true, pinout: EK1960_PINS, desc: "TwinSAFE Logic, 20 safe inputs (X6 / X8), 24 safe outputs from Up1–Up6 (X5 / X7 / X9), relay option X4, power X3 (Us / GND / Up / GND)" },
   { id: "EK1310", name: "EtherCAT P Extension",        fn: "sys",  io: null, ch: 0, w: 12, ebus: -130, ext: true, desc: "EtherCAT P extension with feed-in, M8" },
   { id: "EK1121-0010", name: "1-Port Junction Extended Distance", fn: "sys", io: null, ch: 0, w: 12, ebus: -200, junction: true, ports: 1, desc: "Extended Distance junction (up to 300 m)" },
   { id: "EK1122-0080", name: "2-Port Junction Fast Hot Connect", fn: "sys", io: null, ch: 0, w: 24, ebus: -220, junction: true, jM7: true, desc: "2-port junction with Fast Hot Connect" },
@@ -663,14 +687,14 @@ export const CATALOG = [
   // twinsafe = FSoE bus node (safety telegrams ride the E-bus/EtherCAT, not
   // field wiring). tsLogic = TwinSAFE Logic-capable (an FSoE master that the
   // safe I/O talk to; a TwinCAT Safety PLC on an IPC also counts).
-  { id: "EL1904", name: "4-Ch Safe Input",       fn: "saf", io: "di", ch: 4, w: 12, ebus: -200, safety: true, twinsafe: true },
-  { id: "EL2904", name: "4-Ch Safe Output",      fn: "saf", io: "do", ch: 4, w: 12, ebus: -220, safety: true, twinsafe: true, upA: 2 },
-  { id: "EL6910", name: "TwinSAFE Logic",        fn: "saf", io: null, ch: 0, w: 12, ebus: -220, safety: true, twinsafe: true, tsLogic: true },
-  // — TwinSAFE additions from Beckhoff catalog 2026 (approximate) —
-  { id: "EL1918", name: "8-Ch Safe Input + Logic", fn: "saf", io: "di", ch: 8, w: 12, ebus: -200, safety: true, twinsafe: true, tsLogic: true, desc: "8 fail-safe inputs with integrated TwinSAFE Logic — can be the FSoE master itself (no separate EL6910 needed)" },
-  { id: "EL2911", name: "TwinSAFE Potential Supply 10A", fn: "saf", io: null, ch: 0, w: 12, ebus: -200, safety: true, twinsafe: true, feed: true, pcFeed: true, desc: "Safe 24 V potential feed for power contacts" },
-  { id: "EL2912", name: "2-Ch Safe Output 2.3A", fn: "saf", io: "do", ch: 2, w: 12, ebus: -220, safety: true, twinsafe: true, upA: 4.6 },
-  { id: "EL6930", name: "TwinSAFE Logic + PROFIsafe", fn: "saf", io: null, ch: 0, w: 12, ebus: -220, safety: true, twinsafe: true, tsLogic: true },
+  { id: "EL1904", name: "4-Ch Safe Input",       fn: "saf", io: "di", ch: 4, w: 12, ebus: -200, safety: true, twinsafe: true, pinout: TS_IN4 },
+  { id: "EL2904", name: "4-Ch Safe Output",      fn: "saf", io: "do", ch: 4, w: 24, ebus: -221, safety: true, twinsafe: true, upA: 2, pinout: [null, { r: "p24" }, { r: "gnd" }, null, null, { r: "p24" }, { r: "gnd" }, null, { r: "do", ch: 1 }, { r: "gnd", t: "Output 1−" }, { r: "do", ch: 3 }, { r: "gnd", t: "Output 3−" }, { r: "do", ch: 2 }, { r: "gnd", t: "Output 2−" }, { r: "do", ch: 4 }, { r: "gnd", t: "Output 4−" }] },
+  { id: "EL6910", name: "TwinSAFE Logic",        fn: "saf", io: null, ch: 0, w: 12, ebus: -160, safety: true, twinsafe: true, tsLogic: true },
+  // pinouts, widths and E-bus currents from the Beckhoff manuals (2026)
+  { id: "EL1918", name: "8-Ch Safe Input + Logic", fn: "saf", io: "di", ch: 8, w: 12, hd: true, ebus: -165, safety: true, twinsafe: true, tsLogic: true, pinout: TS_IN8, desc: "8 fail-safe inputs with integrated TwinSAFE Logic — can be the FSoE master itself (no separate EL6910 needed)" },
+  { id: "EL2911", name: "Safe Input + 10 A Safe Feed", fn: "saf", io: "mix", ch: 5, w: 24, ebus: -180, safety: true, twinsafe: true, tsLogic: true, pcFeed: true, tsFeed: true, pinout: [...TS_IN4.map((q) => q.r === "di" ? { ...q } : q), null, { r: "do", ch: 1, t: "Safe output 1 (also the + power contact)" }, { r: "up0", t: "GND Up (the − power contact)" }, { r: "up24", t: "24 V Up, supply of the safe output" }, null, { r: "link", to: 10, t: "Safe output 1" }, { r: "up0", t: "GND Up (the − power contact)" }, { r: "up24", t: "24 V Up, supply of the safe output" }], desc: "4 safe inputs and one 10 A safe output that drives the + power contact of the terminals after it; integrated TwinSAFE Logic" },
+  { id: "EL2912", name: "2-Ch Safe Output 2 A",  fn: "saf", io: "do", ch: 2, w: 12, ebus: -200, safety: true, twinsafe: true, tsLogic: true, upA: 4, pinout: [{ r: "do", ch: 1 }, { r: "p24" }, { r: "gnd" }, { r: "do", ch: 2 }, { r: "gnd", t: "Output 1 GND" }, { r: "p24" }, { r: "gnd" }, { r: "gnd", t: "Output 2 GND" }], desc: "2 safe outputs up to 2 A from the power contacts, integrated TwinSAFE Logic" },
+  { id: "EL6930", name: "TwinSAFE Logic + PROFIsafe", fn: "saf", io: null, ch: 0, w: 12, ebus: -188, safety: true, twinsafe: true, tsLogic: true },
 
   // ==========================================================================
   // Expanded control gear — contactors, motor protection, command & signaling,

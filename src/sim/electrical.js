@@ -103,14 +103,16 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         if (p.port) return;
         const lb = p.label;
         if (d.coupler && d.pinout) {
-          // EK18xx: HD block, roles from the verified pinout
-          const q = d.pinout[Number(lb) - 1];
-          if (!q) return;
+          // EK18xx / EK1914 / EK1960: roles from the verified pinout, by point
+          const q = d.pinout[i];
+          if (!q || !q.r) return;
           if (q.r === "us24") to(i, `us24:${uid}`);
           else if (q.r === "us0") to(i, `us0:${uid}`);
           else if (q.r === "up24") to(i, pc24);
           else if (q.r === "up0") to(i, pc0);
-          else to(i, `ch:${uid}:${Number(lb)}`);
+          else if (q.r === "clk") { to(i, `clk:${uid}:${i + 1}`); fixed.push({ node: `clk:${uid}:${i + 1}`, v: "p24" }); }
+          else if (q.r === "usup") to(i, `ups:${uid}:${q.k}`);
+          else to(i, `ch:${uid}:${i + 1}`);
         } else if (d.coupler) {
           if (lb === "24V") to(i, `us24:${uid}`);
           else if (lb === "0V") to(i, `us0:${uid}`);
@@ -152,7 +154,13 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
         } else {
           const role = railPointRole(d, lb);
           if (!role) return;
-          if (role.r === "p24") to(i, pc24);
+          // TwinSAFE: a clock output is a 24 V source of its own; the EL2911
+          // safe output runs from its Up clamps (tsup) and drives the + contact
+          if (role.r === "clk") { to(i, `clk:${uid}:${Number(lb)}`); fixed.push({ node: `clk:${uid}:${Number(lb)}`, v: "p24" }); }
+          else if (role.r === "up24") to(i, `tsup:${uid}`);
+          else if (role.r === "up0") to(i, pc0);
+          else if (role.r === "link") to(i, `ch:${uid}:${role.to}`);
+          else if (role.r === "p24") to(i, pc24);
           else if (role.r === "gnd") to(i, pc0);
           else if (role.r === "pe") to(i, pcpe);
           else if (role.r === "agnd") to(i, `agnd:${uid}`);
@@ -160,6 +168,9 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (role.n) to(i, `ch:${uid}:${role.n}`);
         }
       });
+      // EK1914: no Up clamp, its power contacts carry Us
+      if (d.coupler && d.pinout && !d.pinout.some((q) => q?.r === "up24") && pc24) { links.push([`us24:${uid}`, pc24]); links.push([`us0:${uid}`, pc0]); }
+      if (d.tsFeed && pc24) links.push([`ch:${uid}:${d.pinout.findIndex((q) => q?.r === "do") + 1}`, pc24]);
       if (d.coupler || d.cx) {
         const pin = (r, lb) => (d.pinout ? d.pinout.findIndex((q) => q?.r === r) : pts.findIndex((x) => x.label === lb));
         const p = pin("us24", "24V"), n = pin("us0", "0V");
@@ -170,7 +181,12 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
       for (const c of ioChannels(d)) {
         const key = `${uid}:${c.n}`, node = `ch:${uid}:${c.n}`;
         if (c.r === "di") diNode[key] = node;
-        else if (c.r === "do") railDo.push({ key, uid, node, group: groupOf[uid] });
+        else if (c.r === "do") {
+          // outputs with their own supply: EK1960 (Up1–Up6 against GND), EL2911 (Up clamps)
+          const q = d.io === "mix" ? d.pinout?.[c.n - 1] : null;
+          const sup = q?.sup ? [`ups:${uid}:${q.sup}`, `us0:${uid}`] : d.tsFeed ? [`tsup:${uid}`, pc0] : null;
+          railDo.push({ key, uid, node, group: groupOf[uid], sup });
+        }
         else if (c.r === "ai") aiNode[key] = node;
       }
       if (d.pcBreak && !d.pcFeed) g = null;
@@ -361,7 +377,8 @@ function solveOnce(cir, st, tripped, overload) {
   for (const o of cir.railDo) {
     if (!st.outputs.get(o.key)) continue;
     if (tripped.has(o.key)) continue;
-    if (!upOk(o.group)) { noUp.push(o.key); continue; }
+    const fed = o.sup ? level(o.sup[0]) === "p24" && level(o.sup[1]) === "gnd" : upOk(o.group);
+    if (!fed) { noUp.push(o.key); continue; }
     add(o.node, "p24", { out: o.key });
     doLive[o.key] = true;
   }
