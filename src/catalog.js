@@ -990,17 +990,25 @@ const ED_REF = {
   ED1808: "EL1808", ED2032: "EL2032", ED2034: "EL2034", ED2808: "EL2808",
   ED2838: "EL2838", ED3174: "EL3174",
   ED3361: ["ED3361-0100", bridge(false)], ED3362: ["ED3362-0100", bridge(true)],
+  ED3172: ["EL3172", "x2"], ED5002: ["EL5002", "x2"],
 };
+// 8 EL clamps → 16 ED clamps: each clamp twice, columns kept (EL 1-4 → ED
+// 1-8, EL 5-8 → ED 9-16); the second of each pair carries no role
+const x2 = (pins) => pins.flatMap((q) => [{ ...q }, { t: `${q.t || "clamp"} (2nd clamp)` }]);
 {
   const byId = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
   const npts = (d) => (d.blk === "hd2x16" || d.blk === "ed2x16" ? 32 : d.hd || d.blk === "el2x8" ? 16 : 8);
   Object.entries(ED_REF).forEach(([id, ref]) => {
     const d = byId[id];
     if (!d || d.pinout || d.pins) return;
-    const [src, pins] = Array.isArray(ref) ? ref : [ref, byId[ref]?.pinout];
+    let [src, pins] = Array.isArray(ref) ? ref : [ref, byId[ref]?.pinout];
+    const dbl = pins === "x2";
+    if (dbl) pins = byId[src]?.pinout?.length === 8 ? x2(byId[src].pinout) : null;
     if (!pins || pins.length !== npts(d)) return;
     d.pinout = pins.map((q) => ({ ...q }));
-    d.desc += `; clamps from the ${src} Infosys table (no ${id} manual yet; same clamp layout assumed)`;
+    d.desc += dbl
+      ? `; clamps from the ${src} Infosys table, each doubled for the 16-point ED housing (no ${id} manual yet; layout assumed)`
+      : `; clamps from the ${src} Infosys table (no ${id} manual yet; same clamp layout assumed)`;
   });
 }
 

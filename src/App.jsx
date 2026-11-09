@@ -2190,6 +2190,19 @@ export default function BeckhoffConfigurator() {
               );
             })}
 
+            {/* EC1100 / EC1110: cutouts over the angled RJ45 ports */}
+            {rails.flatMap((r) => r.items).map((inst) => {
+              const t = layout.pos[inst.uid];
+              if (!t?.d.ec) return null;
+              return t.geom.pts.map((p, i) => {
+                if (!p.port) return null;
+                const A = absPoint(inst.uid, i); if (!A) return null;
+                const w = wires.find((w2) => (w2.a.uid === inst.uid && w2.a.pt === i) || (w2.b.uid === inst.uid && w2.b.pt === i));
+                const far = w && (w.a.uid === inst.uid && w.a.pt === i ? w.b : w.a);
+                return <EcCutout key={`${inst.uid}:${i}`} x={A.x} y={A.y} label={p.label} cable={w ? wireById[w.type] : null} peer={far ? ptName(far) : ""} />;
+              });
+            })}
+
             {/* free-placed components (PCs, panels, drives, field devices…) */}
             {free.map((f) => {
               const vis = freeVis?.uid === f.uid ? freeVis : null;
@@ -3572,6 +3585,45 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
           ? <Hd16Face d={d} W={53} cols={[17, 36]} states={hd} print={false} />
           : <El12Face d={d} W={53} cols={[17, 36]} states={states} print={false} />}
       </g>
+    </g>
+  );
+}
+
+// EC1100 / EC1110: the RJ45 sockets are angled, so the front view can't
+// show what is plugged in. A side-view cutout sits over each port: the
+// tilted socket, the plug and cable when one is connected (cable colour),
+// and the far end (part · point). The cable leaves at the bottom centre,
+// where the wire on the canvas continues.
+function EcCutout({ x, y, label, cable, peer }) {
+  const bw = 112, top = y - 34, bh = 56, sx = x - 36, sy = y - 4;
+  return (
+    <g pointerEvents="none">
+      <rect x={x - bw / 2} y={top} width={bw} height={bh} rx="5" fill="#F7F8F9" stroke="#59616A" strokeWidth="0.9" strokeDasharray="3 2" />
+      <text x={x - bw / 2 + 5} y={top + 9} fill="#3A4148" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{label} · cutout</text>
+      <text x={x + bw / 2 - 5} y={top + 9} fill="#6A737C" fontSize="5.6" textAnchor="end" fontFamily="system-ui">side view</text>
+      {/* housing wall and the socket, tilted 35° */}
+      <rect x={x - bw / 2 + 4} y={top + 13} width="9" height={bh - 17} fill="#C9CDD1" />
+      <g transform={`rotate(35 ${sx} ${sy})`}>
+        <rect x={sx - 12} y={sy - 8} width="24" height="16" rx="1.5" fill="#3A3E42" stroke="#1E2124" strokeWidth="0.6" />
+        <rect x={sx - 9} y={sy - 5} width="14" height="10" fill="#15171A" />
+        {cable && (
+          <g>
+            <rect x={sx - 6} y={sy - 5.5} width="26" height="11" rx="1.5" fill="#DDE7EE" fillOpacity="0.9" stroke="#8FA3B3" strokeWidth="0.6" />
+            <rect x={sx - 4} y={sy - 6.6} width="12" height="2" rx="0.6" fill="#8FA3B3" />
+            {[0, 1, 2, 3].map((k) => <rect key={k} x={sx - 5} y={sy - 4 + k * 2.4} width="5" height="1" fill="#C9A23A" />)}
+            <rect x={sx + 20} y={sy - 4} width="7" height="8" rx="1.5" fill={cable.stroke} />
+          </g>
+        )}
+      </g>
+      {cable ? (
+        <g>
+          <path d={`M ${sx + 20} ${sy + 16} Q ${x} ${sy + 18} ${x} ${top + bh}`} fill="none" stroke={cable.stroke} strokeWidth="4" strokeLinecap="round" />
+          <text x={x + bw / 2 - 5} y={top + 20} fill="#1C2126" fontSize="6" fontWeight="600" textAnchor="end" fontFamily="system-ui">→ {peer}</text>
+          <text x={x + bw / 2 - 5} y={top + 28} fill="#6A737C" fontSize="5.2" textAnchor="end" fontFamily="system-ui">{cable.name.replace(/^EtherCAT /, "").replace(/ \(.*/, "").slice(0, 18)}</text>
+        </g>
+      ) : (
+        <text x={x + bw / 2 - 5} y={top + 22} fill="#8A939C" fontSize="6" textAnchor="end" fontFamily="system-ui">empty</text>
+      )}
     </g>
   );
 }
