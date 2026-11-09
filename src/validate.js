@@ -25,6 +25,7 @@ export function classifyPoint(d, label) {
   if (d.feed && d.anyV) return label === "⏚" ? "pe" : null;         // EL9190: any voltage
   if (d.feed && d.ac) return label === "⏚" ? "pe" : "ac";
   if (d.feed && d.uOut && d.uOut !== 24 && label === "+") return null; // U0 output, not 24 V
+  if (d.feed && d.isoOut && label !== "+" && label !== "−") return null; // EL9561 / EL9562 isolated outputs
   if (d.coupler || d.feed || d.cx || d.cxk === "psu") {
     if (label === "24V" || label === "+") return "p24";
     if (label === "0V" || label === "−") return "gnd";

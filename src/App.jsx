@@ -142,6 +142,8 @@ const WIRES = [
   { id: "cat6a", name: "Ethernet Cat.6A RJ45 (ZB9020)", stroke: "#E3C51E", w: 3.6, net: "eth", conn: "rj45" },
   { id: "ecm12", name: "EtherCAT M12 D-coded (ZK1090-3131)", stroke: "#177A52", w: 3.6, net: "eth", conn: "m12", ec: true },
   { id: "ecm12rj", name: "EtherCAT M12↔RJ45 cord (ZK1090-3191)", stroke: "#2C8A5E", w: 3.6, net: "eth", conn: "m12", ec: true },
+  { id: "ecm8", name: "EtherCAT M8 4-pin cable", stroke: "#147047", w: 3.4, net: "eth", conn: "m8", ec: true },
+  { id: "ecm8rj", name: "EtherCAT M8↔RJ45 cord", stroke: "#2A8257", w: 3.4, net: "eth", conn: "m8", ec: true },
   { id: "ecp",  name: "EtherCAT P — power over EtherCAT, M8 (ZK700x)", stroke: "#0F7A3D", w: 4.0, net: "eth", conn: "m8", ec: true },
   { id: "fog",  name: "Glass fiber duplex — SC (ZK109x)", stroke: "#12A5C6", w: 3.2, net: "fo", conn: "sc", ec: true },
   { id: "pofd", name: "POF duplex — versatile link",    stroke: "#F07820", w: 3.2, net: "fo", conn: "vl", ec: true },
@@ -190,6 +192,8 @@ const NET_FEASIBLE = {
   "rj45+rj45": ["cat5e", "cat6a"],
   "m12net+m12net": ["ecm12", "ecp"],
   "m12net+rj45": ["ecm12rj"],
+  "m8net+m8net": ["ecm8"],
+  "m8net+rj45": ["ecm8rj"],
   "fo+fo": ["fog", "pofd"],
   "usb+usb": ["usb"],
   "dp+dp": ["dp", "cpl4"],
@@ -384,6 +388,8 @@ const EFUSE_GROUPS = (two) => [
   { labels: ["−", "−"],   colors: ["blue", "blue"] },
   { labels: two ? ["I2", "O2"] : ["X", "X"], colors: ["gy", "gy"] },
 ];
+// face alias: a part drawn with another part's face tables (catalog-more-faces.js)
+const fk = (d) => d.face || d.id;
 const BLANK = { fill: "#A19D9A", edge: "#7E7A77", ink: "#A19D9A", text: "", fs: 6 };
 const OLIVE = (text) => ({ fill: "#B3B51B", edge: "#85870F", ink: "#2A2B10", text, fs: 6.4 });
 const EFUSE_TABS = { I1: OLIVE("I1"), O1: OLIVE("O1"), I2: OLIVE("I2"), O2: OLIVE("O2"), X: { hide: true } };
@@ -412,6 +418,16 @@ const FEED12 = {
     { labels: ["−", "−"], colors: ["blue", "blue"] }, { labels: ["S+", "S−"], colors: ["red", "blue"] }],
     leds: ["up", "us"], tabs: { "S+": { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF", text: "24V", fs: 6.4 }, "S−": { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF", text: "0V", fs: 6.4 },
       "+": { text: "24V", fs: 6.4 }, "−": { text: "0V", fs: 6.4 } } },
+  // EL9561 / EL9562 isolated supplies (pictures): + / − from the power
+  // contacts, the isolated output(s) on rows 1 and 4 (not on the contacts)
+  EL9561: { mark: "grey", g: [
+    { labels: ["U0", "U0"], colors: ["gy", "gy"] }, { labels: ["+", "+"], colors: ["red", "red"] },
+    { labels: ["−", "−"], colors: ["blue", "blue"] }, { labels: ["GND", "GND"], colors: ["gy", "gy"] }],
+    leds: ["run", "up"], tabs: { U0: { fill: "#C9CBCE", edge: "#9A9EA2", ink: "#3A3F44", text: "U₀", fs: 6.4 }, GND: { fill: "#C9CBCE", edge: "#9A9EA2", ink: "#3A3F44", text: "GND", fs: 5.4 } } },
+  EL9562: { mark: "grey", g: [
+    { labels: ["O1+", "O1−"], colors: ["red", "blue"] }, { labels: ["+", "+"], colors: ["red", "red"] },
+    { labels: ["−", "−"], colors: ["blue", "blue"] }, { labels: ["O2+", "O2−"], colors: ["red", "blue"] }],
+    leds: ["run", "up", "up"], tabs: { "O1+": { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF", text: "24V", fs: 6.4 }, "O1−": { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF", text: "0V", fs: 6.4 }, "O2+": { fill: "#D3262B", edge: "#9B191D", ink: "#FFFFFF", text: "24V", fs: 6.4 }, "O2−": { fill: "#2C7BC0", edge: "#1D5A90", ink: "#FFFFFF", text: "0V", fs: 6.4 } } },
   EL9221: { mark: "grey", g: EFUSE_GROUPS(false), leds: ["run", "run", "up"], tabs: EFUSE_TABS },
   EL9222: { mark: "grey", g: EFUSE_GROUPS(true), leds: ["run", "run", "up", null, "up"], tabs: EFUSE_TABS },
   EL9227: { mark: "grey", g: EFUSE_GROUPS(true), leds: ["run", "run", "up", null, "up"], tabs: EFUSE_TABS },
@@ -426,7 +442,7 @@ const PIN_LEDS = { EL9576: ["up", "up"] };
 // EL9200 / EL9210 (Infosys; rows measured on the product picture): clamps
 // 1-3 left, 4-6 right, n and n + 3 linked to the same power contact
 const FUSED = { rows: [94, 188.5, 254], labels: [["+", "+"], ["−", "−"], ["⏚", "⏚"]] };
-const feedGroupsFor = (d) => FEED12[d.id]?.g || (d.ac ? AC_FEED_GROUPS : FEED_GROUPS);
+const feedGroupsFor = (d) => FEED12[fk(d)]?.g || (d.ac ? AC_FEED_GROUPS : FEED_GROUPS);
 
 // ---- clamp point geometry (must mirror rendering) ------------------
 // number of network ports a RjTermFace device shows
@@ -455,7 +471,34 @@ const C24 = {
   EL6090: { display: true },
   "ED6001-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"]], ports: [["dsub", 142, "X1"]], female: true, sub: "RS232" },
   "ED6002-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx/Err", "gr"], ["Ch2 Rx/Tx/Err", "gr"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], female: true, sub: "RS232" },
+  // missed-parts pass (catalog-more-faces.js), from the product pictures.
+  // Port tuple: [kind, y, label, female?]. plug: a spring plug at the bottom,
+  // its clamps wirable (role from the label where it is a supply)
+  EL6251: { leds: [["Run", "g", "run"], ["Link/Act", "g", "la"], ["Err", "r"]], ports: [["rj45", 122, "X1"]], sub: "Modbus TCP" },
+  EL6254: { leds: [["Run", "g", "run"], ["Link/Act", "g", "la"], ["Err", "r"]], ports: [0, 1, 2, 3].map((k) => ["rj45", 88 + 60 * k, `X${k + 1}`]), small: true, sub: "Modbus TCP" },
+  EL6689: { leds: [["Run", "g", "run"], ["Status", "g"], ["Err", "r"]], ports: [["sma", 132, "X1"]], sub: "GNSS / GPS sync" },
+  "EL6711-0010": { leds: [["Run", "g", "run"], ["CC-Link", "g"], ["DIAG", "r"]], plug: { lab: "X1", y0: 118, pitch: 17, pins: ["1", "2", "3", "4", "5"] }, sub: "CC-Link" },
+  EL6720: { leds: [["Run", "g", "run"], ["Act", "g"], ["Err", "r"]], ports: [["fo", 132, "X1"]], sub: "LIGHTBUS" },
+  "EL6740-0010": { leds: [["Run", "g", "run"], ["BA/CPU Err", "gr"], ["RC/RD", "g"]], ports: [["dsub", 120, "X1", false], ["dsub", 232, "X2", true]], sub: "INTERBUS" },
+  EL6761: { leds: [["Run", "g", "run"], ["COM", "g"], ["State", "g"]], plug: { lab: "X1", y0: 216, pitch: 16, dark: true, pins: ["PP", "CP", "⏚", "n.c."] }, sub: "ISO 15118" },
+  EL6861: { leds: [["Run", "g", "run"], ["Rx/Err", "gr"], ["Tx/Err", "gr"]], ports: [["dsub", 142, "X1"]], female: true, sub: "BACnet MS/TP" },
+  "EL1262-0010": { leds: [["Run", "g", "run"], ["Rx/Tx Ch1", "g"], ["Rx/Tx Ch2", "g"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], sub: "RS422" },
+  "EL3008-0003": { leds: [["Run", "g", "run"], ["OK/Err", "gr", "run"]], plug: { lab: "X1", y0: 100, pitch: 16, dark: true, pins: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] }, sub: "±3 V" },
+  "EL3008-0005": { leds: [["Run", "g", "run"], ["OK/Err", "gr", "run"]], plug: { lab: "X1", y0: 100, pitch: 16, dark: true, pins: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"] }, sub: "±5 V" },
+  EL3475: { leds: [["Run", "g", "run"], ["System", "g"], ["State", "g"]], ports: [0, 1, 2, 3].map((k) => ["rjs", 88 + 60 * k, `X${k + 1}`]), small: true },
+  EM3701: { leds: [["Run", "g", "run"], ["Overrange", "r"], ["Underrange", "r"]], ports: [["pneu", 140, "+"], ["pneu", 206, "−"]], sub: "±100 hPa" },
+  EM3702: { leds: [["Run", "g", "run"], ["Error X1", "r"], ["Error X2", "r"]], ports: [["pneu", 140, "X1"], ["pneu", 206, "X2"]], sub: "0…7.5 bar" },
+  EM3712: { leds: [["Run", "g", "run"], ["Error X1", "r"], ["Error X2", "r"]], ports: [["pneu", 140, "X1"], ["pneu", 206, "X2"]], sub: "±1 bar" },
+  EM2042: { leds: [], ports: [["dsub25", 120, "X1"]], plug: { lab: "X2", y0: 246, pitch: 16, pins: ["24V", "0V"] }, sub: "16 × DO" },
+  "ED6011-0009": { leds: [["Run", "g", "run"], ["Rx/Tx", "gr"]], ports: [["dsub", 142, "X1"]], female: true, sub: "RS232/422/485" },
+  "ED6012-0009": { leds: [["Run", "g", "run"], ["Ch1 Rx/Tx", "gr"], ["Ch2 Rx/Tx", "gr"]], ports: [["dsub", 120, "X1"], ["dsub", 232, "X2"]], female: true, sub: "RS232/422/485" },
 };
+// x of a C24 plug's clamps, and their y (shared by pointGeom and Comm24Face)
+const plugY = (pl, k) => pl.y0 + 3 + k * pl.pitch + pl.pitch / 2;
+// EKM1101 X3 (picture): Us +, +, −, −; Up +, +, −, −; shield, shield
+const EKM_X3 = { y0: 150, pitch: 15 };
+const EKM_PTS = ["24V", "24V", "0V", "0V", "+", "+", "−", "−", "SH", "SH"];
+const EKM_TIPS = ["Us +24 V (system / E-bus)", "Us +24 V", "Us 0 V", "Us 0 V", "Up +24 V (power contacts)", "Up +24 V", "Up 0 V", "Up 0 V", "shield", "shield"];
 // Embedded PCs (board 07, product pictures): where the connectors sit on
 // each CX face, shared by pointGeom (ports) and CxM7Face (drawing). cxk:
 // c7 CX70xx (16-point I/O block), c8 CX80xx / 81xx / 82xx, pc CX9020 /
@@ -523,12 +566,30 @@ function pointGeom(d) {
   }
   // M7 coupler family (board 04): EK1110 mirrored (12 mm strip left, RJ45
   // housing right), 24 mm RJ45 junctions, couplers with the EL / HD block
+  // new faces from the missed-parts pass (must mirror MoreFace): flat-ribbon
+  // terminals (2 supply clamps), the EL6072 key slot (no clamps), the EM7004
+  // module (24 V / 0 V plug), the EKM1101 (X1 / X2 and the 10-pin X3 plug)
+  if (d.frc) {
+    [0, 1].forEach((k) => pts.push({ x: W * 0.32 + k * W * 0.36, y: 286, label: String(k + 1), size: 5.6, col: k, round: true, tip: `Supply clamp ${k + 1} — role not verified` }));
+    return { W, pts, block: { el12: true, nf: "frc" } };
+  }
+  if (d.keyslot) return { W, pts, block: { el12: true, nf: "key" } };
+  if (d.emod) {
+    ["24V", "0V"].forEach((lb, k) => pts.push({ x: W - 40, y: 262 + k * 16, label: lb, size: 5, round: true, plug: true, role: k ? "gnd" : "p24", tip: `${lb} — module supply` }));
+    return { W, pts, block: { cplr: true, bx: null, nf: "emod" } };
+  }
+  if (d.ekm) {
+    EKM_PTS.forEach((lb, k) => pts.push({ x: W - 33.5, y: plugY(EKM_X3, k), label: lb, size: 5, round: true, plug: true, tip: `X3 ${EKM_TIPS[k]}` }));
+    pts.push({ x: 40, y: 70, label: "X1", port: "rj45", size: 10 });
+    pts.push({ x: 40, y: 150, label: "X2", port: "rj45", size: 10 });
+    return { W, pts, block: { cplr: true, bx: null, nf: "ekm" } };
+  }
   if (d.extM7) {
-    pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: "rj45", size: 10 });
+    if (d.ejPorts !== 0) pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: d.m8 ? "m8net" : "rj45", size: 10 });
     return { W, pts, block: { cplr: true, bx: 0 } };
   }
   if (d.jM7) {
-    [124, 214].forEach((y, i) => pts.push({ x: 44, y, label: `X${i + 1}`, port: "rj45", size: 10 }));
+    [124, 214].forEach((y, i) => pts.push({ x: 44, y, label: `X${i + 1}`, port: d.m8 ? "m8net" : "rj45", size: 10 }));
     return { W, pts, block: { cplr: true, bx: null } };
   }
   if (d.coupler && (!d.safety || d.ek18)) {
@@ -545,20 +606,24 @@ function pointGeom(d) {
     }
     // network ports after the clamps, as before, so saved wire indexes stay valid
     const hx = (bx - 14) / 2;
-    if (d.fiber) {
+    if (d.fbc) {
+      d.fbc.ports.forEach(([kind, y, lab, fem]) => pts.push({ x: hx, y, label: lab, port: kind, size: 10, female: !!fem }));
+    } else if (d.fiber) {
       pts.push({ x: hx - 8, y: 142, label: "X1", port: "fo", size: 10 });
       pts.push({ x: hx - 8, y: 254, label: "X2", port: "fo", size: 10 });
     } else {
-      pts.push({ x: hx, y: 83, label: "X1", port: "rj45", size: 10 });
-      pts.push({ x: hx, y: 189, label: "X2", port: "rj45", size: 10 });
+      pts.push({ x: hx, y: 83, label: "X1", port: d.m8 ? "m8net" : "rj45", size: 10 });
+      pts.push({ x: hx, y: 189, label: "X2", port: d.m8 ? "m8net" : "rj45", size: 10 });
     }
     return { W, pts, block: { cplr: true, bx, cols: c12 } };
   }
   if (d.c24) {
     // EL-24 connector terminals (must mirror Comm24Face): the connectors as
     // ports; the EL6692 / EL6695 X3 plug carries the secondary-side 24 V
-    const f = C24[d.id] || {};
-    (f.ports || []).forEach(([kind, y, lab]) => pts.push({ x: 44, y, label: lab, port: kind, size: 10 }));
+    const f = C24[fk(d)] || {};
+    (f.ports || []).forEach(([kind, y, lab, fem]) => pts.push({ x: 44, y, label: lab, port: kind, size: 10, female: fem ?? !!f.female }));
+    if (f.plug) f.plug.pins.forEach((lb, k) => pts.push({ x: 34.5, y: plugY(f.plug, k), label: lb, size: 5, round: true, plug: true,
+      role: lb === "24V" ? "p24" : lb === "0V" ? "gnd" : undefined, tip: `${f.plug.lab} ${lb}${lb === "24V" || lb === "0V" ? " — supply" : " — function not verified"}` }));
     if (f.x3) {
       pts.push({ x: 34.5, y: 259, label: "24V", size: 5, round: true, plug: true, role: "p24", tip: "X3 24 V — supply of the secondary (EtherCAT) side" });
       pts.push({ x: 34.5, y: 275, label: "0V", size: 5, round: true, plug: true, role: "gnd", tip: "X3 0 V — secondary side supply return" });
@@ -627,7 +692,7 @@ function pointGeom(d) {
       pts.push({ x: c12[col], y: FUSED.rows[row] + EL12.entry, label: lb, size: 6.2, col, round: true })));
     return { W, pts, block: { cols: c12, el12: true, fused: true } };
   }
-  if (d.feed && FEED12[d.id]) {
+  if (d.feed && FEED12[fk(d)]) {
     // EL9 feeds on the 12 mm face (must mirror El12Face): point i sits in
     // row i >> 1, column i & 1, the same order as the feed groups
     const c12 = [W * 0.32, W * 0.68];
@@ -989,7 +1054,13 @@ function pointRole(d, p) {
   if (p.tip) return p.tip;
   if (p.port) {
     if (p.port === "fo") return `${lb} — fiber optic port`;
-    if (p.port === "dsub") return d.cxk ? `${lb} — D-sub 9 (${d.busTxt || d.name.replace("CX Module ", "")})` : `${lb} — D-sub 9 ${C24[d.id]?.female ? "socket" : "plug"} (${C24[d.id]?.sub || "fieldbus"})`;
+    if (d.fbc) return `${lb} — ${d.fbc.bus} ${p.port === "dsub" ? "D-sub 9 socket" : "RJ45"} (fieldbus network not simulated yet)`;
+    if (p.port === "dsub") return d.cxk ? `${lb} — D-sub 9 (${d.busTxt || d.name.replace("CX Module ", "")})` : `${lb} — D-sub 9 ${(p.female ?? C24[fk(d)]?.female) ? "socket" : "plug"} (${C24[fk(d)]?.sub || "fieldbus"})`;
+    if (p.port === "dsub25") return `${lb} — D-sub 25 (16 outputs; breakout cabling not modelled)`;
+    if (p.port === "sma") return `${lb} — SMA antenna socket (GNSS antenna not modelled)`;
+    if (p.port === "pneu") return `${lb} — pneumatic fitting (hose not modelled)`;
+    if (p.port === "rjs") return `${lb} — sensor port, RJ45-type (not Ethernet; sensor cabling not modelled)`;
+    if (p.port === "m8net") return `${lb} — EtherCAT ${d.coupler ? (lb === "X1" ? "IN" : "OUT") : "OUT"} (M8 socket)`;
     if (p.port === "dnet") return `${lb} — DeviceNet 5-pin open-style plug`;
     if (p.port === "usb") return `${lb} — USB port`;
     if (p.port === "dvi") return `${lb} — DVI-D video output`;
@@ -2800,6 +2871,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {!el12 && <rect x="-1.2" y={190} width="3" height="12" rx="1.2" fill="#C9CDD2" stroke="rgba(0,0,0,0.25)" strokeWidth="0.5" />}
 
       {compact ? <CompactFace d={d} W={W} sim={sim} /> :
+        geom.block?.nf ? <MoreFace d={d} W={W} geom={geom} sim={sim} /> :
         d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.extM7 ? <ExtensionFace d={d} W={W} sim={sim} /> :
         cplr && d.c24 ? <Comm24Face d={d} W={W} sim={sim} /> :
@@ -2940,14 +3012,14 @@ const TS_MODS = [345, 475, 605, 735, 865];
 function el12Tab(d, n) {
   if (d.safety) return TS_TABS[d.id]?.[n] || { hide: true };
   if (d.coupler || (d.cxk && !d.pinout)) return FEED_TAB[FEED_GROUPS[(n - 1) % 4].labels[n > 4 ? 1 : 0]];
-  if (FEED12[d.id]) {
+  if (FEED12[fk(d)]) {
     const lb = feedGroupsFor(d)[(n - 1) % 4].labels[n > 4 ? 1 : 0];
-    return { ...FEED_TAB[lb], ...FEED12[d.id].tabs?.[lb] };
+    return { ...FEED_TAB[lb], ...FEED12[fk(d)].tabs?.[lb] };
   }
   if (d.pins) {
     // EL9186 / EL9187 carry olive marker tabs numbered across the rows
     // (01 02 / 03 04 …), the others show their potential
-    if (PIN_TABS[d.id]?.[n]) return PIN_TABS[d.id][n];
+    if (PIN_TABS[fk(d)]?.[n]) return PIN_TABS[fk(d)][n];
     if (d.distTabs === "num") return { ...FEED_TAB.L, text: `0${((n - 1) % 4) * 2 + (n <= 4 ? 1 : 2)}`, fs: 6.4 };
     return FEED_TAB[DIST_TAB[d.pins[n - 1]] || "NC"];
   }
@@ -3010,7 +3082,7 @@ const elMark = (d) => {
   if (d.coupler) return ["#C96E14", "#94500B"]; // couplers: orange
   // TwinSAFE (product pictures): olive on safe inputs, red on safe outputs, grey on the logic
   if (d.safety) return !d.io ? ["#A8A4A1", "#7E7A77"] : d.io === "di" ? ["#B9B81E", "#878710"] : ["#D3262B", "#9B191D"];
-  const f = FEED12[d.id];
+  const f = FEED12[fk(d)];
   if (f) return f.mark === "grey" ? ["#A8A4A1", "#7E7A77"] : ["#C96E14", "#94500B"]; // feeds: orange, EL9410 grey
   if (d.pins) return ["#A8A4A1", "#7E7A77"]; // distribution: grey
   return d.io === "do" || d.io === "ai" || d.io === "ao" ? ED_MARK[d.io] : ["#DCD13B", "#A39A22"];
@@ -3203,7 +3275,7 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
     const lit = (k) => k === "us" ? (sim ? !!sim.us : powered && fed(["24V", "S+"]))
       : k === "up" ? (sim ? !!sim.up : powered && fed(["+", "L"]))
       : k === "run" ? (sim ? !!sim.alive : powered) : false;
-    return <El12Face d={d} W={W} cols={cols} states={FEED12[d.id].leds.map(lit)} />;
+    return <El12Face d={d} W={W} cols={cols} states={FEED12[fk(d)].leds.map(lit)} />;
   }
   if (b.logic) {
     // EL6910 / EL6930: the LEDs sit in the bottom two rows (Run green, the rest red diag)
@@ -3227,7 +3299,7 @@ function ElFace({ d, W, uid, geom, wiredPts, powered = true, sim = null }) {
       </g>
     );
   }
-  if (b.el12 && PIN_LEDS[d.id]) return <El12Face d={d} W={W} cols={cols} states={PIN_LEDS[d.id].map(() => (sim ? !!sim.up : powered))} />;
+  if (b.el12 && PIN_LEDS[fk(d)]) return <El12Face d={d} W={W} cols={cols} states={PIN_LEDS[fk(d)].map(() => (sim ? !!sim.up : powered))} />;
   if (b.el12) return <El12Face d={d} W={W} cols={cols} states={ledStates.slice(0, 8)} />;
   if (b.ed2 || b.hd2) {
     // two 16-point blocks side by side (board 06); the run LED on the left
@@ -3482,16 +3554,16 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
             </g>
           ))}
         </g>
-      ) : (
+      ) : d.fbc ? <FbcPanel d={d} hx={hx} bx={bx} sim={sim} /> : (
         <g>
           <text x={hx - 27} y="45" fill={M.txtDim} fontSize="5" fontFamily="system-ui">X1 IN</text>
-          <RjJack cx={hx} cy={83} la={la} />
+          {d.m8 ? <M8Jack cx={hx} cy={83} la={la} /> : <RjJack cx={hx} cy={83} la={la} />}
           <text x={hx - 27} y="151" fill={M.txtDim} fontSize="5" fontFamily="system-ui">X2 OUT</text>
-          <RjJack cx={hx} cy={189} la={la} />
+          {d.m8 ? <M8Jack cx={hx} cy={189} la={la} /> : <RjJack cx={hx} cy={189} la={la} />}
           {d.idSwitch && <NumberKey x={bx - 36} y={136} />}
         </g>
       )}
-      <EtherCatMark x={bx - 4} y={84} />
+      {!d.fbc && <EtherCatMark x={bx - 4} y={84} />}
       {vprint(bx - 18, TH - 6, "BECKHOFF", 12, C.brand)}
       {vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
       {/* the terminal block: the EL face, or the HD face on the EK18xx */}
@@ -3533,7 +3605,9 @@ function ExtensionFace({ d, W, sim = null }) {
       <EtherCatMark x={63} y={84} />
       {vprint(64, TH - 6, "BECKHOFF", 9, C.brand)}
       {vprint(76, TH - 8, d.id, 6.4, M.txt, true)}
-      <RjJack cx={67 + (W - 67) / 2} cy={64} contacts="left" la={sim ? !!sim.alive : true} top="#C9B23A" bot="#46E36E" />
+      {d.ejPorts === 0 ? <text x={67 + (W - 67) / 2} y="66" fill={M.txtDim} fontSize="5.6" textAnchor="middle" fontFamily="system-ui">EJ</text>
+        : d.m8 ? <M8Jack cx={67 + (W - 67) / 2} cy={64} la={sim ? !!sim.alive : true} />
+        : <RjJack cx={67 + (W - 67) / 2} cy={64} contacts="left" la={sim ? !!sim.alive : true} top="#C9B23A" bot="#46E36E" />}
     </g>
   );
 }
@@ -3558,16 +3632,16 @@ function DSub({ cx, cy, female }) {
   );
 }
 // orange spring plug (EL6752 DeviceNet, EL6692 / EL6695 X3)
-function OrangePlug({ cx, y0, n, pitch = 17, nums = true }) {
+function OrangePlug({ cx, y0, n, pitch = 17, nums = true, dark = false }) {
   return (
     <g>
-      <rect x={cx - 15} y={y0} width="30" height={n * pitch + 6} rx="2" fill="#F2A21A" stroke="#B87708" strokeWidth="0.6" />
+      <rect x={cx - 15} y={y0} width="30" height={n * pitch + 6} rx="2" fill={dark ? "#3A3D40" : "#F2A21A"} stroke={dark ? "#1E2022" : "#B87708"} strokeWidth="0.6" />
       {Array.from({ length: n }).map((_, k) => {
         const y = y0 + 3 + k * pitch;
         return (
           <g key={k}>
             <rect x={cx - 11} y={y + 2} width="11" height={pitch - 4} rx="1.2" fill="#2E3134" />
-            <rect x={cx + 2} y={y + 3.5} width="8" height={pitch - 7} rx="1" fill="#F7C35A" stroke="#C98A10" strokeWidth="0.4" />
+            <rect x={cx + 2} y={y + 3.5} width="8" height={pitch - 7} rx="1" fill={dark ? "#E9EBED" : "#F7C35A"} stroke={dark ? "#8E9398" : "#C98A10"} strokeWidth="0.4" />
             {nums && <text x={cx + 20} y={y + pitch / 2 + 2} fill="#3A3F44" fontSize="5.2" fontFamily="system-ui">{k + 1}</text>}
           </g>
         );
@@ -3575,11 +3649,44 @@ function OrangePlug({ cx, y0, n, pitch = 17, nums = true }) {
     </g>
   );
 }
+// SMA antenna socket (EL6689), blue push-in pneumatic fitting (EM37xx),
+// round M8 EtherCAT socket (EKxxxx-0008), all as on the pictures
+function SmaJack({ cx, cy }) {
+  return (
+    <g>
+      <path d={`M${cx - 9} ${cy} l 4.5 -7.8 h 9 l 4.5 7.8 l -4.5 7.8 h -9 z`} fill="#D9BE5C" stroke="#9C8228" strokeWidth="0.7" />
+      <circle cx={cx} cy={cy} r="5.2" fill="#E8D58A" stroke="#9C8228" strokeWidth="0.6" />
+      <circle cx={cx} cy={cy} r="2.6" fill="#F4F0E2" stroke="#9C8228" strokeWidth="0.4" />
+      <circle cx={cx} cy={cy} r="0.9" fill="#9C8228" />
+    </g>
+  );
+}
+function PneuFitting({ cx, cy }) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r="13" fill="#9DA2A7" stroke="#6E7378" strokeWidth="0.6" />
+      <circle cx={cx} cy={cy} r="10" fill="#2E6FC2" stroke="#1D4F90" strokeWidth="0.8" />
+      <circle cx={cx} cy={cy} r="4.6" fill="#1A1C1E" />
+    </g>
+  );
+}
+function M8Jack({ cx, cy, la = true }) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r="13" fill="#C9CDD1" stroke="#8E9398" strokeWidth="0.7" />
+      <circle cx={cx} cy={cy} r="9.4" fill="#A9AEB3" stroke="#6E7378" strokeWidth="0.6" />
+      <circle cx={cx} cy={cy} r="6" fill="#2A2D30" />
+      {[[-2.4, -2.4], [2.4, -2.4], [-2.4, 2.4], [2.4, 2.4]].map(([dx, dy], i) => <circle key={i} cx={cx + dx} cy={cy + dy} r="0.95" fill="#D7B24A" />)}
+      <rect x={cx - 1.2} y={cy - 7.8} width="2.4" height="2" fill="#2A2D30" />
+      <circle cx={cx - 15} cy={cy - 14} r="2.4" fill={la ? "#46E36E" : "#4A4E52"} />
+    </g>
+  );
+}
 // EL-24 compact housing with a fieldbus connector (board 06, product
 // pictures): orange top bar, status LEDs, connectors from C24 (pointGeom
 // places the ports), light-pipe notches, print at the bottom
 function Comm24Face({ d, W, sim = null }) {
-  const f = C24[d.id] || {};
+  const f = C24[fk(d)] || {};
   const run = sim ? sim.run || false : true, la = sim ? !!sim.alive : true;
   const COL = { g: "#46E36E", r: "#FF3B30", y: "#E8C21A" };
   const lit = (k) => (k === "run" ? run : k === "la" ? la : false);
@@ -3605,7 +3712,7 @@ function Comm24Face({ d, W, sim = null }) {
           {T(22, 82, "BRIDGE", { fs: 7 })}
         </g>
       )}
-      {(f.ports || []).map(([kind, y, lab], i) => (
+      {(f.ports || []).map(([kind, y, lab, fem], i) => (
         <g key={i}>
           {kind === "rj45" && (f.small
             ? <g transform={`translate(44 ${y}) scale(0.84) translate(-44 ${-y})`}><RjJack cx={44} cy={y} contacts="left" la={la} top="#C9B23A" bot="#46E36E" /></g>
@@ -3613,7 +3720,12 @@ function Comm24Face({ d, W, sim = null }) {
           {kind === "rj45" && (f.bridge
             ? <g>{T(74, y - 14, i ? "OUT" : "IN")}{T(74, y - 7, lab)}</g>
             : T(f.small ? 72 : 74, y - (f.small ? 10 : 14), lab))}
-          {kind === "dsub" && <g><DSub cx={44} cy={y} female={f.female} />{T(65, y + 2, lab)}</g>}
+          {kind === "dsub" && <g><DSub cx={44} cy={y} female={fem ?? f.female} />{T(65, y + 2, lab)}</g>}
+          {kind === "dsub25" && <g><g transform={`translate(44 ${y}) scale(1 1.9) translate(-44 ${-y})`}><DSub cx={44} cy={y} /></g>{T(65, y + 2, lab)}</g>}
+          {kind === "sma" && <g><SmaJack cx={44} cy={y} />{T(62, y - 12, lab)}</g>}
+          {kind === "fo" && <g><ScPort cx={44} cy={y} /><path d={`M30 ${y - 20} l -4 -4 m 4 4 l -4 4`} stroke="#3A3F44" strokeWidth="0.8" fill="none" />{T(66, y - 20, lab)}</g>}
+          {kind === "rjs" && <g><g transform={`translate(44 ${y}) scale(0.84) translate(-44 ${-y})`}><RjJack cx={44} cy={y} contacts="left" la={false} top="#4A4E52" bot="#4A4E52" /></g>{T(72, y - 10, lab)}</g>}
+          {kind === "pneu" && <g><PneuFitting cx={44} cy={y} />{T(64, y - 16, lab)}</g>}
           {kind === "dnet" && <g>{T(38, y - 51.5, lab)}<OrangePlug cx={44} y0={y - 45.5} n={5} /></g>}
         </g>
       ))}
@@ -3621,6 +3733,13 @@ function Comm24Face({ d, W, sim = null }) {
         <g>
           <OrangePlug cx={40} y0={248} n={2} pitch={16} nums={false} />
           {T(64, 260, "24V", { fs: 5.6, fw: 400 })}{T(64, 270, "X3", { fs: 5.6, fw: 400 })}{T(64, 280, "0V", { fs: 5.6, fw: 400 })}
+        </g>
+      )}
+      {f.plug && (
+        <g>
+          {T(34, f.plug.y0 - 4, f.plug.lab, { fs: 5.6 })}
+          <OrangePlug cx={40} y0={f.plug.y0} n={f.plug.pins.length} pitch={f.plug.pitch} nums={false} dark={!!f.plug.dark} />
+          {f.plug.pins.map((t, k) => <g key={k}>{T(60, plugY(f.plug, k) + 2, t, { fs: 5.2, fw: 400 })}</g>)}
         </g>
       )}
       {f.display && (
@@ -3891,7 +4010,7 @@ function JunctionFace({ d, W, sim = null }) {
       <text x="14" y="68" fill="#3A3F44" fontSize="11" fontWeight="500" fontFamily="system-ui">Ether<tspan fontWeight="800">CAT</tspan></text>
       {[[124, "X1"], [214, "X2"]].map(([cy, t]) => (
         <g key={t}>
-          <RjJack cx={44} cy={cy} contacts="left" la={la} top="#C9B23A" bot="#46E36E" />
+          {d.m8 ? <M8Jack cx={44} cy={cy} la={la} /> : <RjJack cx={44} cy={cy} contacts="left" la={la} top="#C9B23A" bot="#46E36E" />}
           <text x="74" y={cy - 14} fill="#3A3F44" fontSize="6" fontWeight="600" fontFamily="system-ui">{t}</text>
           <text x="74" y={cy - 7} fill="#3A3F44" fontSize="6" fontWeight="600" fontFamily="system-ui">OUT</text>
         </g>
@@ -3901,6 +4020,165 @@ function JunctionFace({ d, W, sim = null }) {
       <text x="62" y="318" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
     </g>
   );
+}
+
+/* --- missed-parts faces (catalog-more-faces.js) ------------------------ */
+// fieldbus coupler left panel (EK9xxx / EK3100 pictures): three LEDs, the
+// bus connectors, the address switches, the bus name
+function FbcPanel({ d, hx, bx, sim = null }) {
+  const f = d.fbc, run = sim ? !!sim.us : true;
+  return (
+    <g>
+      {f.leds.map((t, k) => (
+        <g key={t}>
+          <circle cx={16} cy={24 + k * 11} r="3.4" fill={k === 0 && run ? "#46E36E" : "#4A4E52"} />
+          <text x={23} y={26 + k * 11} fill="#3A3F44" fontSize="5.2" fontWeight="600" fontFamily="system-ui">{t}</text>
+        </g>
+      ))}
+      {f.ports.map(([kind, y, lab, fem]) => (
+        <g key={lab}>
+          <text x={hx - 27} y={y - (kind === "dsub" ? 54 : 40)} fill={M.txtDim} fontSize="5" fontFamily="system-ui">{lab}</text>
+          {kind === "dsub" ? <DSub cx={hx} cy={y} female={fem} /> : <RjJack cx={hx} cy={y} la={false} />}
+        </g>
+      ))}
+      {f.sw === "dip" ? (
+        <g>
+          <text x={hx - 16} y={210} fill={M.txtDim} fontSize="4.8" fontFamily="system-ui">S001</text>
+          <rect x={hx - 16} y={214} width="32" height="12" rx="1" fill="#2E6FC2" stroke="#1D4F90" strokeWidth="0.5" />
+          {Array.from({ length: 8 }).map((_, i) => <rect key={i} x={hx - 14 + i * 3.6} y={216.5} width="2.4" height="7" fill="#F1F2F3" />)}
+        </g>
+      ) : (
+        <g>
+          {[0, 1].map((k) => (
+            <g key={k}>
+              <circle cx={hx - 10 + k * 20} cy={226} r="7" fill="#E9EBED" stroke="#8E9398" strokeWidth="0.6" />
+              <rect x={hx - 11.2 + k * 20} y={220} width="2.4" height="7" rx="1" fill="#3A3F44" />
+              <text x={hx - 10 + k * 20} y={240} fill={M.txtDim} fontSize="4.6" textAnchor="middle" fontFamily="system-ui">{`S00${k + 1}`}</text>
+            </g>
+          ))}
+        </g>
+      )}
+      <text x={hx} y={272} fill="#3A3F44" fontSize="7" fontWeight="700" textAnchor="middle" fontFamily="system-ui">{f.logo}</text>
+      <text x={hx} y={284} fill={M.txtDim} fontSize="4.6" textAnchor="middle" fontFamily="system-ui">network not simulated yet</text>
+    </g>
+  );
+}
+
+// faces for pointGeom's nf blocks
+function MoreFace({ d, W, geom, sim = null }) {
+  const nf = geom.block.nf, run = sim ? sim.run || false : true;
+  const T = (x, y, t, o = {}) => <text x={x} y={y} fill={o.c || "#3A3F44"} fontSize={o.fs || 6} fontWeight={o.fw || 600} fontFamily="system-ui" textAnchor={o.a || "start"}>{t}</text>;
+  const print = (y = TH - 20.5) => (
+    <g>
+      <text x={W / 2} y={y} fill="#2B2F33" fontSize={d.id.length > 6 ? 5 : 6.4} fontWeight="700" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+      <text x={W / 2} y={y + 8.5} fill="#2B2F33" fontSize="5.6" fontWeight="800" fontFamily="system-ui" textAnchor="middle" style={{ letterSpacing: "0.3px" }}>BECKHOFF</text>
+    </g>
+  );
+  if (nf === "frc") {
+    // flat-ribbon terminals (pictures): 16 LEDs on top (green inputs, red
+    // outputs), the shrouded ribbon header, two supply clamps at the bottom
+    const isOut = (i) => d.io === "do" || (d.io === "mix" && i >= 8);
+    return (
+      <g>
+        <rect x="6" y="8" width={W - 12} height="72" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+        <rect x="8" y="10" width={W - 16} height="68" rx="1" fill="#2C2F32" />
+        {Array.from({ length: 16 }).map((_, i) => (
+          <rect key={i} x={i < 8 ? 11 : W / 2 + 2} y={13 + (i % 8) * 8} width={W / 2 - 13} height="4.6" rx="0.8"
+            fill={i >= d.ch ? "#3A3D40" : i === 0 && run ? (isOut(i) ? "#FF3B30" : "#46E36E") : "#4A4E52"} />
+        ))}
+        {T(W / 2, 92, "X1", { fs: 5.4, a: "middle" })}
+        <rect x={W / 2 - 14} y="96" width="28" height="150" rx="2" fill="#2A2D30" stroke="#16181A" strokeWidth="0.6" />
+        <rect x={W / 2 - 9} y="102" width="18" height="138" rx="1" fill="#1A1C1E" />
+        <rect x={W / 2 - 16} y="164" width="3" height="14" fill="#2A2D30" />
+        {Array.from({ length: 10 }).map((_, i) => [0, 1].map((c) => <rect key={`${i}${c}`} x={W / 2 - 5 + c * 6} y={106 + i * 13} width="2" height="2" fill="#D7B24A" />))}
+        {[0, 1].map((k) => (
+          <g key={k}>
+            <rect x={W * 0.32 + k * W * 0.36 - 7} y={272} width="14" height="26" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
+            <circle cx={W * 0.32 + k * W * 0.36} cy={286} r="5" fill="#2E3134" />
+          </g>
+        ))}
+        {print(TH - 22)}
+      </g>
+    );
+  }
+  if (nf === "key") {
+    // EL6072 (picture): licence-key slot, A Presence / B Battery check LEDs
+    return (
+      <g>
+        <rect x="4.5" y="6" width={W - 9} height="13" rx="1" fill="#A8A4A1" stroke="#7E7A77" strokeWidth="0.5" />
+        {[["A", "Presence"], ["B", "Battery"]].map(([k, t], i) => (
+          <g key={k}>
+            <circle cx="12" cy={32 + i * 12} r="3.2" fill={i === 0 && run ? "#46E36E" : "#4A4E52"} />
+            {T(18, 34 + i * 12, `${k} ${t}`, { fs: 4.6, fw: 500 })}
+          </g>
+        ))}
+        <rect x={W / 2 - 10} y="80" width="20" height="150" rx="3" fill="#2E3134" stroke="#16181A" strokeWidth="0.6" />
+        <rect x={W / 2 - 6} y="88" width="12" height="134" rx="2" fill="#1A1C1E" />
+        {T(W / 2, 246, "KEY", { fs: 5.4, a: "middle" })}
+        {print()}
+      </g>
+    );
+  }
+  if (nf === "emod") {
+    // EM7004 (picture): axis plugs X0–X3 (4 columns) and X4–X7 (2 columns),
+    // the orange 24 V / 0 V plug on the right
+    const big = (k) => ({ x: 18 + k * 112, y: 60, w: 100, h: 230, cols: 4, rows: 8, rp: 27.5, rh: 20 });
+    const small = (k) => ({ x: 470 + ((k - 4) % 2) * 66, y: k < 6 ? 60 : 176, w: 56, h: 100, cols: 2, rows: 5, rp: 18, rh: 12 });
+    return (
+      <g>
+        <rect x="0.5" y="0" width={W - 1} height={TH} rx="2" fill="url(#cplrbody)" />
+        <rect x="12" y="2" width="80" height="7" rx="1" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => {
+          const g = k < 4 ? big(k) : small(k);
+          return (
+            <g key={k}>
+              {T(g.x, g.y - 6, `X${k}`)}
+              <rect x={g.x} y={g.y} width={g.w} height={g.h} rx="2" fill="#3A3D40" stroke="#1E2022" strokeWidth="0.6" />
+              {Array.from({ length: g.cols * g.rows }).map((_, i) => {
+                const c = i % g.cols, r = Math.floor(i / g.cols), cw = (g.w - 12) / g.cols;
+                return <rect key={i} x={g.x + 6 + c * cw + 1} y={g.y + 8 + r * g.rp} width={cw - 2} height={g.rh} rx="1" fill="#1A1C1E" />;
+              })}
+            </g>
+          );
+        })}
+        {T(W - 46, 245, "X8", { fs: 5.6 })}
+        <OrangePlug cx={W - 34.5} y0={251} n={2} pitch={16} nums={false} />
+        {T(W - 18, 264, "24V", { fs: 5.2, fw: 400 })}{T(W - 18, 280, "0V", { fs: 5.2, fw: 400 })}
+        {T(470, 300, "axis plugs drawn only — not modelled", { fs: 5.2, fw: 400, c: M.txtDim })}
+        <text x="14" y="320" fill="#2B2F33" fontSize="6.6" fontWeight="800" fontFamily="system-ui">BECKHOFF</text>
+        <text x="72" y="320" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
+      </g>
+    );
+  }
+  if (nf === "ekm") {
+    // EKM1101 (picture): X1 IN / X2 OUT, ID rotaries x1 / x16, the black
+    // 10-pin X3 plug, the red BECKHOFF stripe
+    const la = sim ? !!sim.alive : true;
+    const lab = (t, k) => (t === "SH" ? "Shield" : k < 4 ? `Us ${t === "24V" ? "+" : "−"}` : `Up ${t}`);
+    return (
+      <g>
+        <rect x="0.5" y="0" width={W - 1} height={TH} rx="1.5" fill="url(#cplrbody)" />
+        <rect x={W - 9} y="0" width="8.5" height={TH} fill={C.brand} />
+        {T(14, 38, "X1 IN", { fs: 5.2, fw: 500 })}
+        <RjJack cx={40} cy={70} la={la} />
+        {T(14, 118, "X2 OUT", { fs: 5.2, fw: 500 })}
+        <RjJack cx={40} cy={150} la={la} />
+        {[["x1", 214], ["x16", 244]].map(([t, y]) => (
+          <g key={t}>
+            <circle cx="30" cy={y} r="8" fill="#E9EBED" stroke="#8E9398" strokeWidth="0.6" />
+            <rect x="28.8" y={y - 6.5} width="2.4" height="7" rx="1" fill="#3A3F44" />
+            {T(18, y + 15, t, { fs: 4.8, fw: 400 })}
+          </g>
+        ))}
+        {T(W - 42, EKM_X3.y0 - 4, "X3", { fs: 5.6 })}
+        <OrangePlug cx={W - 28} y0={EKM_X3.y0} n={10} pitch={EKM_X3.pitch} nums={false} dark />
+        {EKM_PTS.map((t, k) => <g key={k}>{T(W - 47, plugY(EKM_X3, k) + 2, lab(t, k), { fs: 4.4, fw: 400, a: "end" })}</g>)}
+        {vprint(W - 2.5, TH - 8, "BECKHOFF", 6.4, "#FFFFFF", true)}
+        <text x="10" y="324" fill="#2B2F33" fontSize="6.2" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
+      </g>
+    );
+  }
+  return null;
 }
 
 /* --- EK1914 / EK1960 coupler (old face until the TwinSAFE family) ------ */
@@ -4844,7 +5122,18 @@ function PortGlyph({ x, y, kind, label }) {
             <circle key={i} cx={x + dx} cy={y + dy} r="0.9" fill="#26282B" />
           ))}
         </g>
-      ) : kind === "dsub" ? (
+      ) : kind === "m8net" ? (
+        <g>
+          <circle cx={x} cy={y} r="5.5" fill="#B5BABF" stroke="#54585C" strokeWidth="1" />
+          <circle cx={x} cy={y} r="2.6" fill="#26282B" />
+        </g>
+      ) : kind === "sma" ? (
+        <circle cx={x} cy={y} r="5" fill="#D9BE5C" stroke="#9C8228" strokeWidth="1" />
+      ) : kind === "pneu" ? (
+        <circle cx={x} cy={y} r="5.5" fill="#2E6FC2" stroke="#1D4F90" strokeWidth="1" />
+      ) : kind === "rjs" ? (
+        <rect x={x - 7} y={y - 5.5} width="14" height="11" rx="1.5" fill="#4A4E52" stroke="#C9CBCD" strokeWidth="0.8" />
+      ) : kind === "dsub" || kind === "dsub25" ? (
         <path d={`M ${x - 7} ${y - 5} h 14 l -2 10 h -10 z`} fill="#9EA4AA" stroke="#54585C" strokeWidth="0.8" />
       ) : kind === "dnet" ? (
         <rect x={x - 4} y={y - 7} width="8" height="14" rx="1" fill="#F2A21A" stroke="#B87708" strokeWidth="0.8" />

@@ -128,6 +128,9 @@ export function buildCircuit(doc, byId, pos, wireById, station) {
           else if (lb === "−") to(i, pc0);
           else to(i, pcpe);
         } else if (d.feed) {
+          // EL9561 / EL9562: + / − sit on the passing power contacts (the
+          // supply input); the isolated outputs are not solved
+          if (d.isoOut) { if (lb === "+") to(i, pc24); else if (lb === "−") to(i, pc0); return; }
           if (!d.pcFeed || lb === "NC") return; // EL91x0 clamps 1 / 5: not used
           // EL922x electronic fuses: 24 V in on 2 / 6, output 1 drives the +
           // contact, output 2 its own clamp; the channels are taken as closed

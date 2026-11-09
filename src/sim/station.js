@@ -121,7 +121,7 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
   else {
     // first coupler with a free X1 — where a laptop's Ethernet cable would go
     const si = segs.findIndex((s) => {
-      if (!s.headD?.coupler) return false;
+      if (!s.headD?.coupler || s.headD.fbc) return false; // fieldbus couplers: not EtherCAT
       const pts = pos[s.head]?.geom.pts || [];
       const x1 = pts.findIndex((p) => p.label === "X1");
       return x1 >= 0 && !netWired.has(`${s.head}:${x1}`);
@@ -176,6 +176,7 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
   for (const u of order) {
     if (u[0] === "s") {
       const s = segs[+u.slice(1)];
+      if (s.headD?.fbc) continue; // a fieldbus coupler's station is not on the EtherCAT bus
       for (const uid of s.items) {
         reachable.add(uid);
         const d = pos[uid]?.d;
@@ -207,7 +208,9 @@ export function buildStation(doc, byId, pos, wireById, runtimeId) {
   }
   const strays = segs.filter((s) => !s.head).flatMap((s) => s.items);
   for (const s of segs) {
-    if (s.head && !reachable.has(s.head))
+    if (s.head && s.headD.fbc)
+      notes.push({ level: "info", msg: `${s.headD.id} on rail ${s.ri + 1} is a ${s.headD.fbc.bus} bus coupler — its network is not simulated yet (v0.2 roadmap), so its terminals are drawn and powered but not on the EtherCAT bus.` });
+    else if (s.head && !reachable.has(s.head))
       notes.push({ level: "warn", msg: `${s.headD.id} on rail ${s.ri + 1} is not cabled to the master — its terminals are not on the bus. Cable its X1 from the previous station's EK1110 / X2.` });
   }
   const unitUids = (u) => (u[0] === "s" ? segs[+u.slice(1)].items : [u.slice(1)]);

@@ -479,6 +479,7 @@ in the catalog (12 mm, 8- and 16-point, from beckhoff.com). Still to add:
 | 5 | TwinSAFE | 9 | EL1904, EL2904, EL6910, EL1918, EK1914, EK1960 |
 | 6 | Wide and special EL (done, board 06) | 45 incl. 10 ED | EL6614, EL6731, EL7041, EL7211-0010, ED7062 |
 | 7 | Embedded PCs (CX) (in the app, board 07) | 64 | CX7000, CX8190, CX9020, CX5130, CX2033 + CX2100 |
+| 7b | Missed parts from beckhoff.com (board 08) | 268 | EK9000, EK1100-0008, EKM1101, EL6689, EL1862, EL9222-9482, ED9410, EM7004 |
 | 8 | Power supplies | 8 | PS1011-2410, PS2001-4810, PS3021-2440 |
 | 9 | EtherCAT Box IP67 | 14 | EP1008-0001, EP2338-0001, EP3174-0002 |
 | 10 | Drives and motors | 6 | AX5103, AX5203, AX8100, AX8206, AM8031 |
@@ -495,6 +496,19 @@ photos or logo artwork go into the app (see CLAUDE.md conventions).
 - #25 **Spare-capacity report.**
 - #17 **Bandwidth / cycle-time estimate:** PLCSIM's `frameStats` already
   computes this; show it in topology.
+- **Fieldbus coupler networks.** The EK9000 / EK9020 (Modbus TCP), EK9300 /
+  EK9320 (PROFINET), EK9500 / EK9520 (EtherNet/IP), EK9160 (IoT) and EK3100
+  (PROFIBUS) are in the catalog with their faces (board 08). They head a
+  station, power it and feed its E-bus, but they are not EtherCAT: today
+  `station.js` leaves their stations off the EtherCAT bus with an info note.
+  To do: model them as non-EtherCAT heads in topology and validation (a
+  Modbus TCP / PROFINET / EtherNet/IP / PROFIBUS master to cable them to,
+  their own process image, address switch settings), so Simulate can run
+  their terminals.
+- **Connectors that are drawn but not wirable yet:** EM2042 D-sub 25 (its 16
+  outputs), EL6689 SMA antenna, EM37xx pneumatic fittings, EL3475 sensor
+  ports, flat-ribbon headers (EL1852 / 186x / 187x / 287x), EM7004 axis plugs,
+  the EK1110-0043 / -0044 EJ side.
 
 ## Out of scope
 Accounts, cloud sync, instructor dashboards and certificates (CodePLC's

@@ -14,6 +14,7 @@
 import { EXTRA } from "./catalog-extended.js";
 import { ETG } from "./catalog-etg.js";
 import { MORE, MORE_GROUPS } from "./catalog-more.js";
+import { moreFaces, FACE_GROUPS } from "./catalog-more-faces.js";
 // TwinSAFE clamp roles (Beckhoff manuals, 2026): clk = the clock (test-pulse)
 // output that feeds a safe input's contact, "Input x+"; the safe input itself
 // is the "Input x−" clamp. usup = an output supply clamp (EK1960 Up1–Up6),
@@ -952,6 +953,8 @@ export const CATALOG = [
   // EtherCAT Technology Group product directory (generated — see scripts/gen-etg.py)
   ...ETG,
 ];
+// the last missed parts (new faces / feeds), built from the base parts above
+CATALOG.push(...moreFaces(Object.fromEntries(CATALOG.map((d) => [d.id, d]))));
 
 // every catalog entry carries a manufacturer; unset → Beckhoff
 CATALOG.forEach((d) => { if (!d.brand) d.brand = "beckhoff"; });
@@ -1003,6 +1006,7 @@ const KIND_GROUP = {
 };
 // parts from catalog-more.js whose palette group is not their fn
 GROUPS.forEach((g) => { if (MORE_GROUPS[g.key]) g.ids.push(...MORE_GROUPS[g.key]); });
+GROUPS.forEach((g) => { if (FACE_GROUPS[g.key]) g.ids.push(...FACE_GROUPS[g.key]); });
 {
   const listed = new Set(GROUPS.flatMap((g) => g.ids));
   const byKey = Object.fromEntries(GROUPS.map((g) => [g.key, g]));

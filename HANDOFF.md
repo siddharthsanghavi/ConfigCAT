@@ -104,6 +104,17 @@ npm run shots          # regenerate README screenshots (see below)
   treats CX power blocks like a coupler; a CX2100 (`cxk: "psu"`) feeds the
   `us24` / `us0` nodes of the CX20xx head to its left. `cxk: "mod"` parts are
   skipped by `ebusSegments`, validation and topology.
+  Board 08 (missed parts, `src/catalog-more.js` generated + `src/catalog-more-faces.js`
+  hand-written, pushed into CATALOG after it is built): `d.face` aliases a
+  part onto another's C24 / FEED12 / PIN_TABS / PIN_LEDS entry (`fk(d)`).
+  C24 port tuples take a 4th `female` flag; `plug` adds a spring plug with
+  wirable clamps (`plugY`). New port kinds: `m8net` (EKxxxx-0008, cables
+  `ecm8` / `ecm8rj`), `sma`, `pneu`, `rjs`, `dsub25` (drawn, no cable fits).
+  `geom.block.nf` (frc / key / emod / ekm) → `MoreFace`. `d.fbc` = fieldbus
+  coupler on `CouplerM7Face` with `FbcPanel`; `station.js` keeps its station
+  off the EtherCAT bus. `d.isoOut` (EL9561 / EL9562): + / − on the passing
+  power contacts, the isolated outputs unsolved. `noSig` = no clamp-to-channel
+  guess.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the
   pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
   terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the
