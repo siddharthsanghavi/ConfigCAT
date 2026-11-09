@@ -992,7 +992,7 @@ const ED_REF = {
   ED3361: ["ED3361-0100", bridge(false)], ED3362: ["ED3362-0100", bridge(true)],
   ED3172: ["EL3172", "x2"], ED5002: ["EL5002", "x2"],
   // no own table: the nearest sibling with the same housing and channel count
-  "EL7041-0052": "EL7041", EL4172: "EL4072", ED4172: "ED4072", ED4174: "ED4074",
+  "EL7041-0052": "EL7041", EL4172: "EL4072", ED4172: "ED4072", ED4174: "ED4074", "ED8601-8411": "EL8601-8411",
 };
 // 8 EL clamps → 16 ED clamps: each clamp twice, columns kept (EL 1-4 → ED
 // 1-8, EL 5-8 → ED 9-16); the second of each pair carries no role
