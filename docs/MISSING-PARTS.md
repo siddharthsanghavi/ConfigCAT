@@ -22,6 +22,8 @@ Checked the 341 EL / ED parts that had no pinout against the connection tables i
 - **Table did not match the housing, left for a manual check** (14): ED4074, EL3453-0020, EL3453-0100, EL3483, EL3483-0060, EL3783, EL3783-0100, EL4074, EL4078, EL5001-0011, EL5001-0012, EL5101-0010, EL5101-0011, EL5101-0090.
 - **Pinout only as a picture in Infosys** (29): EL3602, EL3602-0002, EL3602-0010, EL3612, EL3621-0020, EL3632, EL3681, EL3692, EL4172, EL4374, EL5021, EL5151, EL6001, EL6021, EL6021-0021, EL6070, EL6080, EL6201, EL7031, EL7031-0030, EL7037, EL7041-0052, EL7062, EL7201-0010, EL7201-9014, EL7211-9014, EL7221-9014, EL7332, EL8601-8411.
 - **No Infosys manual yet** (22, mostly new ED push-in parts): ED1808, ED2032, ED2034, ED2808, ED2838, ED3172, ED3174, ED3274, ED3361, ED3362, ED4172, ED4174, ED5002, ED6011, ED6012, ED6060, ED6781, ED7211-0010, ED8601-8411, EL6071, EL6685, EL6685-0010.
+  - **Referenced from a counterpart** (8, `ED_REF` in `src/catalog.js`, flagged in each desc): ED1808 ← EL1808, ED2032 ← EL2032, ED2034 ← EL2034, ED2808 ← EL2808, ED2838 ← EL2838, ED3174 ← EL3174 (same clamp count, EL table copied); ED3361 / ED3362 ← the ED3361-0100 / ED3362-0100 tables (UBridge+ as the channel input).
+  - **Still open** (11): ED3172 (EL3172 has 8 clamps, ED has 16), ED5002 (EL5002: 8 vs 16), ED7211-0010 (EL7211-0010: 32 vs 16), ED4172 / ED8601-8411 (EL counterpart has no table either), ED4174, ED6011, ED6012, ED6060, ED6781, ED3274 (no EL counterpart in the catalog); EL6071, EL6685, EL6685-0010.
 - The 10 KL parts are left for the K-bus family.
 
 ## Priority: standard base parts

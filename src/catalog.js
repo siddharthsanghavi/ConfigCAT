@@ -968,6 +968,42 @@ CATALOG.forEach((d) => {
   if (!/Infosys/.test(d.desc)) d.desc += `; ${note}`;
 });
 
+// ED push-in parts with no Infosys manual yet: borrow the clamp table of
+// the EL counterpart (or an ED sibling) where the clamp count matches.
+// Flagged in desc; the ED layout is assumed to follow the reference.
+const bridge = (two) => {
+  const n = (i) => ({ t: "n.c. · not connected" });
+  const ch = (c, s) => [
+    { r: "ai", ch: c, t: `Ch${c} UBridge${s} · input bridge voltage${s}` },
+    { t: `Ch${c} USense${s} · input reference voltage${s}` },
+    { t: `Ch${c} UExc${s} · output sensor power supply${s}` },
+  ];
+  const side = (s) => {
+    const c1 = ch(1, s); if (s === "−") delete c1[0].r, delete c1[0].ch;
+    const c2 = two ? ch(2, s).reverse() : [n(), n(), n()];
+    if (two && s === "−") { delete c2[2].r; delete c2[2].ch; }
+    return [n(), ...c1, ...c2, n()];
+  };
+  return [...side("+"), ...side("−")];
+};
+const ED_REF = {
+  ED1808: "EL1808", ED2032: "EL2032", ED2034: "EL2034", ED2808: "EL2808",
+  ED2838: "EL2838", ED3174: "EL3174",
+  ED3361: ["ED3361-0100", bridge(false)], ED3362: ["ED3362-0100", bridge(true)],
+};
+{
+  const byId = Object.fromEntries(CATALOG.map((d) => [d.id, d]));
+  const npts = (d) => (d.blk === "hd2x16" || d.blk === "ed2x16" ? 32 : d.hd || d.blk === "el2x8" ? 16 : 8);
+  Object.entries(ED_REF).forEach(([id, ref]) => {
+    const d = byId[id];
+    if (!d || d.pinout || d.pins) return;
+    const [src, pins] = Array.isArray(ref) ? ref : [ref, byId[ref]?.pinout];
+    if (!pins || pins.length !== npts(d)) return;
+    d.pinout = pins.map((q) => ({ ...q }));
+    d.desc += `; clamps from the ${src} Infosys table (no ${id} manual yet; same clamp layout assumed)`;
+  });
+}
+
 // every catalog entry carries a manufacturer; unset → Beckhoff
 CATALOG.forEach((d) => { if (!d.brand) d.brand = "beckhoff"; });
 
