@@ -2221,6 +2221,8 @@ export default function BeckhoffConfigurator() {
                   )}
                   {iolink && <path d={path} fill="none" stroke="#4AA3FF" strokeWidth={t.w + 4} opacity="0.4" strokeLinecap="round" />}
                   {t.shield && <path d={path} fill="none" stroke="#5F656C" strokeWidth={t.w + 2} />}
+                  {cab && <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} sock={A.sock} dir={A.dir} sw={A.sw} />}
+                  {cab && <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} sock={B.sock} dir={B.dir} sw={B.sw} />}
                   {cab ? <CableBody d={path} t={t} /> : <path d={path} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" strokeLinejoin="round" />}
                   {t.gnye && <path d={path} fill="none" stroke="#F2D703" strokeWidth={t.w} strokeLinecap="round" strokeDasharray="7 9" />}
                   {t.net === "fo" && <path d={path} fill="none" stroke="#FFFFFF" strokeWidth="1" strokeDasharray="5 5" opacity="0.8" />}
@@ -2234,8 +2236,8 @@ export default function BeckhoffConfigurator() {
                       <animate attributeName="opacity" values="0.95;0.1;0.95" dur="1.1s" repeatCount="indefinite" />
                     </path>
                   )}
-                  {cab ? <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} sock={A.sock} dir={A.dir} sw={A.sw} /> : <WireEnd x={A.x} y={A.y} t={t} />}
-                  {cab ? <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} sock={B.sock} dir={B.dir} sw={B.sw} /> : <WireEnd x={B.x} y={B.y} t={t} />}
+                  {!cab && <WireEnd x={A.x} y={A.y} t={t} />}
+                  {!cab && <WireEnd x={B.x} y={B.y} t={t} />}
                   {w.label && (
                     <text x={(A.x + B.x) / 2} y={cab ? cab.midY + 14 : ductY - 5} fill={C.ink} fontSize="10" textAnchor="middle"
                       style={{ paintOrder: "stroke", stroke: "#EDEFF1", strokeWidth: 4 }}>{w.label}</text>
@@ -2283,9 +2285,9 @@ export default function BeckhoffConfigurator() {
               const cab = cableLook(t, A, B);
               return (
                 <g key={`top-${w.id}`} pointerEvents="none">
-                  <CableBody d={cab.d} t={t} />
                   <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} sock={A.sock} dir={A.dir} sw={A.sw} />
                   <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} sock={B.sock} dir={B.dir} sw={B.sw} />
+                  <CableBody d={cab.d} t={t} />
                 </g>
               );
             })}
@@ -2666,15 +2668,17 @@ function cableLook(t, A, B) {
   if (!isCable(t)) return null;
   const sa = plugScale(A), sb = plugScale(B);
   const a = cableExit(A, sa), b = cableExit(B, sb);
-  const dist = Math.hypot(b.x - a.x, b.y - a.y);
-  const k = Math.min(170, 30 + dist * 0.3);
-  // ports above one another: bow the loop sideways so it doesn't lie on itself
-  const bow = Math.max(0, 46 - Math.abs(b.x - a.x)) * (b.x >= a.x ? 1 : -1);
-  // an angled slot sends the cable out sideways first, then it hangs
-  const ca = A.sock === "ang" && !A.loose ? `${a.x + A.dir * 18} ${a.y + k * 0.6}` : `${a.x + bow} ${a.y + k}`;
-  const cb = B.sock === "ang" && !B.loose ? `${b.x + B.dir * 18} ${b.y + k * 0.6}` : `${b.x + bow} ${b.y + k}`;
-  const d = `M ${a.x} ${a.y} C ${ca}, ${cb}, ${b.x} ${b.y}`;
-  return { d, sa, sb, midY: (a.y + b.y) / 2 + 0.75 * k };
+  const dx = b.x - a.x, sg = dx >= 0 ? 1 : -1;
+  // ports nearly above one another: a soft loop bowed to the side
+  if (Math.abs(dx) < 30) {
+    const k = Math.min(120, 30 + Math.abs(b.y - a.y) * 0.3), bow = (46 - Math.abs(dx)) * sg;
+    return { d: `M ${a.x} ${a.y} C ${a.x + bow} ${a.y + k}, ${b.x + bow} ${b.y + k}, ${b.x} ${b.y}`, sa, sb, midY: Math.max(a.y, b.y) + 0.75 * k };
+  }
+  // otherwise the cable hangs straight down from each plug and runs level
+  // below the lower one, with rounded bends (no slanted runs across devices)
+  const low = Math.max(a.y, b.y) + 34, r = 12;
+  const d = `M ${a.x} ${a.y} V ${low - r} Q ${a.x} ${low} ${a.x + sg * r} ${low} H ${b.x - sg * r} Q ${b.x} ${low} ${b.x} ${low - r} V ${b.y}`;
+  return { d, sa, sb, midY: low };
 }
 // the cable type a drag preview shows, before the far end is known
 function previewWireType(p) {
@@ -2787,6 +2791,43 @@ function BootEnd({ x, y, w, h, fill, cw }) {
 // opening (latch in the latch step), the boot points at the viewer and the
 // cable leaves from it. Angled EC slot: the plug fills the slot and the boot
 // leaves sideways out of it.
+// EC1100 (push-in): the EK1100 clamp block with orange push-in release
+// buttons instead of spring openings
+function EcBlock({ d, W, cols, states }) {
+  return (
+    <g>
+      {[4.5, W - 25].map((x) => <rect key={x} x={x} y="6" width="20.5" height="13" rx="1" fill="#E6E8EA" stroke="#B9BDC1" strokeWidth="0.5" />)}
+      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
+      {Array.from({ length: 8 }).map((_, s) => (
+        <rect key={s} x={cols[s % 2] - 7} y={27.5 + Math.floor(s / 2) * 8.5} width="14" height="5" rx="0.8" fill={states[s] ? "#46E36E" : "#4A4E52"} />
+      ))}
+      {[0, 1, 2, 3].map((row) => {
+        const g = EL12.gTop + row * EL12.gh;
+        return (
+          <g key={row}>
+            <rect x="3" y={g - 3} width={W - 6} height={EL12.gh - 4} rx="1.2" fill="#ECEEF0" stroke="#C3C7CB" strokeWidth="0.5" />
+            {cols.map((cx, ci) => {
+              const n = ci * 4 + row + 1, t = row < 3 ? el12Tab(d, n) : { hide: true }, by = g + EL12.entry - 17.5;
+              return (
+                <g key={ci}>
+                  {t.hide ? <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill="#DADDE0" stroke="#B4B8BC" strokeWidth="0.5" />
+                    : <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />}
+                  {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
+                  <rect x={cx - 6.5} y={by} width="13" height="7.5" rx="0.8" fill="#EE7A3C" stroke="#B9561F" strokeWidth="0.5" />
+                  <rect x={cx - 5.5} y={by + 3} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                  <rect x={cx - 5.5} y={by + 5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                  <circle cx={cx - 0.5} cy={by + 0.6} r="1.7" fill="#2B2E31" />
+                  <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{n}</text>
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
 function SeatedPlug({ x, y, t, s, sock, dir, sw, cw, boot }) {
   let g;
   if (t.conn === "rj45" && (sock === "jack" || sock === "jackL")) {
@@ -3884,7 +3925,8 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
       {vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
       {/* the terminal block: the EL face, or the HD face on the EK18xx */}
       <g transform={`translate(${bx} 0)`}>
-        {d.ek18
+        {d.ec ? <EcBlock d={d} W={53} cols={[17, 36]} states={states} />
+          : d.ek18
           ? <Hd16Face d={d} W={53} cols={[17, 36]} states={hd} print={false} />
           : <El12Face d={d} W={53} cols={[17, 36]} states={states} print={false} />}
       </g>

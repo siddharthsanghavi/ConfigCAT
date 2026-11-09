@@ -117,7 +117,9 @@ and exporting documentation. Deliverable: **`Sids-EtherCAT-Configurator.html`**
 - **Realistic connector cables**: RJ45, M8, M12, fibre, PC and D-sub
   cables hang in a soft curve from real plugs (clear RJ45 body with gold
   contacts, latch and coloured boot; knurled M8 / M12 nuts) with a round
-  jacket; field wiring keeps the clean orthogonal routing below.
+  jacket. Cables hang straight down from the plug and run level with
+  rounded bends (no slanted runs across devices); field wiring keeps the
+  orthogonal duct routing below.
 - **Plugs sit in their sockets**: a connected port shows the plug seated in
   the opening (clear body, latch in the latch step) with the boot facing the
   viewer and the cable leaving from it, matched to each socket's orientation.
@@ -277,7 +279,8 @@ disconnects on the canvas to operate them; the docked panel holds the rest.
 
 ## Recently done
 - **Drag-and-drop, realistic cables** with seated plugs (§4). EC1100 /
-  EC1110 are drawn on the EK1100 / EK1110 faces.
+  EC1110 are drawn on the EK1100 / EK1110 faces; the EC1100 keeps its
+  push-in clamps (orange release buttons).
 - **Simulate** (v0.2-dev, §11): PLCSIM's engine inside the configurator,
   with live I/O and LEDs.
 - **Fix: removing a rail** no longer drops the project name and every
