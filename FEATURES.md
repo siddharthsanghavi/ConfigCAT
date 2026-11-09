@@ -279,8 +279,8 @@ disconnects on the canvas to operate them; the docked panel holds the rest.
 
 ## Recently done
 - **Drag-and-drop, realistic cables** with seated plugs (§4). EC1100 /
-  EC1110 are drawn on the EK1100 / EK1110 faces; the EC1100 keeps its
-  push-in clamps (orange release buttons).
+  EC1110 are drawn on the EK1100 / EK1110 faces with their push-in
+  clamps (orange release buttons).
 - **Simulate** (v0.2-dev, §11): PLCSIM's engine inside the configurator,
   with live I/O and LEDs.
 - **Fix: removing a rail** no longer drops the project name and every

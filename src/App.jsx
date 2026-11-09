@@ -3954,8 +3954,20 @@ function ExtensionFace({ d, W, sim = null }) {
         const g = EL12.gTop + r * EL12.gh;
         return (
           <g key={`${r}${cx}`}>
-            <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
-            <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
+            {d.ec ? (
+              // EC1110 (push-in): orange release buttons above the openings
+              <g>
+                <rect x={cx - 6.5} y={g + EL12.entry - 17.5} width="13" height="7.5" rx="0.8" fill="#EE7A3C" stroke="#B9561F" strokeWidth="0.5" />
+                <rect x={cx - 5.5} y={g + EL12.entry - 14.5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                <rect x={cx - 5.5} y={g + EL12.entry - 12.5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                <circle cx={cx - 0.5} cy={g + EL12.entry - 16.9} r="1.7" fill="#2B2E31" />
+              </g>
+            ) : (
+              <g>
+                <rect x={cx - 7} y={g + 15} width="14" height="13" rx="1.2" fill="#B3B7BB" stroke="#8C9094" strokeWidth="0.5" />
+                <rect x={cx - 5} y={g + 17} width="10" height="8" rx="0.8" fill="#585C60" />
+              </g>
+            )}
             <circle cx={cx} cy={g + EL12.entry} r="6.2" fill="#9EA2A6" stroke="#7C8084" strokeWidth="0.5" />
             <circle cx={cx} cy={g + EL12.entry} r="4.3" fill="#2E3134" />
           </g>
