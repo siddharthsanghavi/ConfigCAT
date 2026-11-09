@@ -118,9 +118,13 @@ and exporting documentation. Deliverable: **`Sids-EtherCAT-Configurator.html`**
   cables hang in a soft curve from real plugs (clear RJ45 body with gold
   contacts, latch and coloured boot; knurled M8 / M12 nuts) with a round
   jacket; field wiring keeps the clean orthogonal routing below.
-- **EC1100 / EC1110 port panel**: their RJ45 sockets sit in an angled face,
-  so hovering the coupler shows each port face-on with what is plugged in,
-  the far end and the cable type. The angle does not change the routing.
+- **Plugs sit in their sockets**: a connected port shows the plug seated in
+  the opening (clear body, latch in the latch step) with the boot facing the
+  viewer and the cable leaving from it, matched to each socket's orientation.
+- **EC1100 / EC1110 (push-in)**: drawn as the product picture, with the RJ45
+  sockets as angled slots in a slanted face (plugs follow the slot, the boot
+  leaves sideways) and push-in clamps. Hovering a port shows the ports
+  face-on with what is plugged in, the far end and the cable type.
 - **Cable color convention**: red = +24 V, black = 0 V, blue = 24 V
   signal, orange = AC, GN/YE = PE, gray = shielded analog/encoder.
 - **Highlighting**:
@@ -276,8 +280,8 @@ disconnects on the canvas to operate them; the docked panel holds the rest.
 ---
 
 ## Recently done
-- **Drag-and-drop, realistic cables** (§4) and the **EC1100 / EC1110 hover
-  port panel**.
+- **Drag-and-drop, realistic cables** with seated plugs (§4), and the
+  **EC1100 / EC1110** angled-port face with a face-on panel on port hover.
 - **Simulate** (v0.2-dev, §11): PLCSIM's engine inside the configurator,
   with live I/O and LEDs.
 - **Fix: removing a rail** no longer drops the project name and every

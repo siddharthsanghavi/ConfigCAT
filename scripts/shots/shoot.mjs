@@ -189,10 +189,12 @@ async function runStep(page, step, scene, results) {
     case "drag": return drag(page, arg[0], arg[1]);
     // rest the real mouse on a device (hover panels, e.g. the EC1100 ports)
     case "hover": {
-      const loc = page.locator(`main [data-uid="${arg}"]`).first();
+      // "uid" rests on the device, ["uid", point] on one of its points
+      const loc = Array.isArray(arg) ? await point(page, arg[0], arg[1]) : page.locator(`main [data-uid="${arg}"]`).first();
       await loc.scrollIntoViewIfNeeded();
       const b = await loc.boundingBox();
-      await page.mouse.move(b.x + b.width * 0.25, b.y + b.height * 0.85);
+      if (Array.isArray(arg)) await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+      else await page.mouse.move(b.x + b.width * 0.25, b.y + b.height * 0.85);
       return page.waitForTimeout(80);
     }
     case "dragHold": return drag(page, arg[0], arg[1], true);

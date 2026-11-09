@@ -573,8 +573,8 @@ function pointGeom(d) {
     for (let k = 0; k < 4; k++) add(44, 278 + 12 * k, i++);
     for (let k = 0; k < 10; k++) add(278, 154.75 + 17.5 * k, i++);
     for (const mx of TS_MODS) for (let k = 0; k < 10; k++) add(mx + 66, 204.2 + 12.4 * k, i++);
-    pts.push({ x: 46, y: 46, label: "X1", port: "rj45", size: 10 });
-    pts.push({ x: 46, y: 102, label: "X2", port: "rj45", size: 10 });
+    pts.push({ x: 46, y: 46, label: "X1", port: "rj45", size: 10, sock: "jack", ps: 0.78 });
+    pts.push({ x: 46, y: 102, label: "X2", port: "rj45", size: 10, sock: "jack", ps: 0.78 });
     return { W, pts, block: { compact: true } };
   }
   // M7 coupler family (board 04): EK1110 mirrored (12 mm strip left, RJ45
@@ -593,16 +593,17 @@ function pointGeom(d) {
   }
   if (d.ekm) {
     EKM_PTS.forEach((lb, k) => pts.push({ x: W - 33.5, y: plugY(EKM_X3, k), label: lb, size: 5, round: true, plug: true, tip: `X3 ${EKM_TIPS[k]}` }));
-    pts.push({ x: 40, y: 70, label: "X1", port: "rj45", size: 10 });
-    pts.push({ x: 40, y: 150, label: "X2", port: "rj45", size: 10 });
+    pts.push({ x: 40, y: 70, label: "X1", port: "rj45", size: 10, sock: "jack" });
+    pts.push({ x: 40, y: 150, label: "X2", port: "rj45", size: 10, sock: "jack" });
     return { W, pts, block: { cplr: true, bx: null, nf: "ekm" } };
   }
   if (d.extM7) {
-    if (d.ejPorts !== 0) pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: d.m8 ? "m8net" : "rj45", size: 10 });
+    if (d.ec) pts.push(...ecSlots(d, W).map((q) => ({ ...q, port: "rj45", size: 10 })));
+    else if (d.ejPorts !== 0) pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jackL" });
     return { W, pts, block: { cplr: true, bx: 0 } };
   }
   if (d.jM7) {
-    [124, 214].forEach((y, i) => pts.push({ x: 44, y, label: `X${i + 1}`, port: d.m8 ? "m8net" : "rj45", size: 10 }));
+    [124, 214].forEach((y, i) => pts.push({ x: 44, y, label: `X${i + 1}`, port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jackL" }));
     return { W, pts, block: { cplr: true, bx: null } };
   }
   if (d.coupler && (!d.safety || d.ek18)) {
@@ -615,18 +616,20 @@ function pointGeom(d) {
       }
     } else {
       FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
-        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
+        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true, sq: !!d.ec })));
     }
     // network ports after the clamps, as before, so saved wire indexes stay valid
     const hx = (bx - 14) / 2;
     if (d.fbc) {
-      d.fbc.ports.forEach(([kind, y, lab, fem]) => pts.push({ x: hx, y, label: lab, port: kind, size: 10, female: !!fem }));
+      d.fbc.ports.forEach(([kind, y, lab, fem]) => pts.push({ x: hx, y, label: lab, port: kind, size: 10, female: !!fem, sock: "jack" }));
     } else if (d.fiber) {
       pts.push({ x: hx - 8, y: 142, label: "X1", port: "fo", size: 10 });
       pts.push({ x: hx - 8, y: 254, label: "X2", port: "fo", size: 10 });
+    } else if (d.ec) {
+      pts.push(...ecSlots(d, W).map((q) => ({ ...q, port: "rj45", size: 10 })));
     } else {
-      pts.push({ x: hx, y: 83, label: "X1", port: d.m8 ? "m8net" : "rj45", size: 10 });
-      pts.push({ x: hx, y: 189, label: "X2", port: d.m8 ? "m8net" : "rj45", size: 10 });
+      pts.push({ x: hx, y: 83, label: "X1", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jack" });
+      pts.push({ x: hx, y: 189, label: "X2", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jack" });
     }
     return { W, pts, block: { cplr: true, bx, cols: c12 } };
   }
@@ -634,7 +637,7 @@ function pointGeom(d) {
     // EL-24 connector terminals (must mirror Comm24Face): the connectors as
     // ports; the EL6692 / EL6695 X3 plug carries the secondary-side 24 V
     const f = C24[fk(d)] || {};
-    (f.ports || []).forEach(([kind, y, lab, fem]) => pts.push({ x: 44, y, label: lab, port: kind, size: 10, female: fem ?? !!f.female }));
+    (f.ports || []).forEach(([kind, y, lab, fem]) => pts.push({ x: 44, y, label: lab, port: kind, size: 10, female: fem ?? !!f.female, sock: "jackL", ps: f.small ? 0.84 : 1 }));
     if (f.plug) f.plug.pins.forEach((lb, k) => pts.push({ x: 34.5, y: plugY(f.plug, k), label: lb, size: 5, round: true, plug: true,
       role: lb === "24V" ? "p24" : lb === "0V" ? "gnd" : undefined, tip: `${f.plug.lab} ${lb}${lb === "24V" || lb === "0V" ? " — supply" : " — function not verified"}` }));
     if (f.x3) {
@@ -686,7 +689,7 @@ function pointGeom(d) {
       }
     } else if (blk) {
       FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
-        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
+        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true, sq: !!d.ec })));
     }
     cxLayout(d, W).P.forEach((q) => pts.push({ x: q.x, y: q.y, label: q.label, port: q.kind, size: q.kind === "usb" ? 7 : 10 }));
     return { W, pts, block: { cplr: true, bx: blk ? bx : null, cols: c12, cxk: k } };
@@ -1220,7 +1223,6 @@ export default function BeckhoffConfigurator() {
     flashRef.current = setTimeout(() => setFlash(null), 2600);
   };
   const [hover, setHover] = useState(null);
-  const [hoverDev, setHoverDev] = useState(null); // device under the pointer (EC port panel)
   const [showWires, setShowWires] = useState(true);
   const [copied, setCopied] = useState(false);
   const [q, setQ] = useState("");
@@ -1646,7 +1648,7 @@ export default function BeckhoffConfigurator() {
     const by = dragging ? freeVis.y : t.y;
     // duct = the y level just below this device where its wires may travel
     const duct = t.free ? by + t.geom.H + 24 : RAIL_TOP + t.ri * (TH + RAIL_GAP) + TH + 30;
-    return { x: bx + p.x, y: by + p.y, duct, free: !!t.free };
+    return { x: bx + p.x, y: by + p.y, duct, free: !!t.free, sock: p.ang ? "ang" : p.sock || "small", dir: p.ang || 0, sw: p.sw || 0, ps: p.ps || 1 };
   };
   const wiredPts = useMemo(() => {
     const s = new Set();
@@ -2178,8 +2180,7 @@ export default function BeckhoffConfigurator() {
                       onDragStart={simOn ? null : (e) => startDragTerm(inst.uid, e)}
                       onPointDown={pointDown} onPointUp={pointUp}
                       onHover={(u, i) => setHover({ uid: u, pt: i })}
-                      onLeave={() => setHover(null)}
-                      onDevHover={setHoverDev} />
+                      onLeave={() => setHover(null)} />
                   ))}
                   <BackplaneLayer rail={rail} y={y} layout={layout} fsoeActive={fsoeActive} />
                 </g>
@@ -2236,8 +2237,8 @@ export default function BeckhoffConfigurator() {
                       <animate attributeName="opacity" values="0.95;0.1;0.95" dur="1.1s" repeatCount="indefinite" />
                     </path>
                   )}
-                  {cab ? <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} /> : <WireEnd x={A.x} y={A.y} t={t} />}
-                  {cab ? <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} /> : <WireEnd x={B.x} y={B.y} t={t} />}
+                  {cab ? <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} sock={A.sock} dir={A.dir} sw={A.sw} /> : <WireEnd x={A.x} y={A.y} t={t} />}
+                  {cab ? <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} sock={B.sock} dir={B.dir} sw={B.sw} /> : <WireEnd x={B.x} y={B.y} t={t} />}
                   {w.label && (
                     <text x={(A.x + B.x) / 2} y={cab ? cab.midY + 14 : ductY - 5} fill={C.ink} fontSize="10" textAnchor="middle"
                       style={{ paintOrder: "stroke", stroke: "#EDEFF1", strokeWidth: 4 }}>{w.label}</text>
@@ -2248,15 +2249,16 @@ export default function BeckhoffConfigurator() {
 
             {/* EC1100 / EC1110: while the pointer is on the coupler, a panel
                 beside it shows its angled ports face-on (what is plugged in) */}
-            {hoverDev && layout.pos[hoverDev]?.d.ec && !layout.pos[hoverDev].free && (() => {
-              const t = layout.pos[hoverDev];
+            {hover && layout.pos[hover.uid]?.d.ec && layout.pos[hover.uid].geom.pts[hover.pt]?.port && (() => {
+              const hoverDev = hover.uid, t = layout.pos[hoverDev];
               const ports = t.geom.pts.map((p, i) => {
                 if (!p.port) return null;
                 const w = wires.find((w2) => (w2.a.uid === hoverDev && w2.a.pt === i) || (w2.b.uid === hoverDev && w2.b.pt === i));
                 const far = w && (w.a.uid === hoverDev && w.a.pt === i ? w.b : w.a);
-                return { label: p.label, cable: w ? wireById[w.type] : null, peer: far ? ptName(far) : "" };
+                return { label: p.label, cable: w ? wireById[w.type] : null, peer: far ? ptName(far) : "", on: i === hover.pt };
               }).filter(Boolean);
-              return <EcPortsPanel x={t.x + t.geom.W + 10} y={t.y + 6} id={t.d.id} ports={ports} />;
+              const q = t.geom.pts[hover.pt];
+              return <EcPortsPanel x={t.x + (t.d.extM7 ? q.x - 210 + q.sw / 2 : q.x - q.sw / 2)} y={t.y + q.y + 16} id={t.d.id} ports={ports} />;
             })()}
 
             {/* free-placed components (PCs, panels, drives, field devices…) */}
@@ -2299,8 +2301,8 @@ export default function BeckhoffConfigurator() {
               return (
                 <g key={`top-${w.id}`} pointerEvents="none">
                   <CableBody d={cab.d} t={t} />
-                  <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} />
-                  <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} />
+                  <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} sock={A.sock} dir={A.dir} sw={A.sw} />
+                  <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} sock={B.sock} dir={B.dir} sw={B.sw} />
                 </g>
               );
             })}
@@ -2311,14 +2313,14 @@ export default function BeckhoffConfigurator() {
               const src = resolveEnd(cableDragRef.current.a);
               if (!P || !src) return null;
               const t = wireById[previewWireType(src.p)];
-              const Q = { x: cableCursor.x, y: cableCursor.y, free: P.free };
+              const Q = { x: cableCursor.x, y: cableCursor.y, free: P.free, loose: true };
               const cab = cableLook(t, P, Q);
               return (
                 <g pointerEvents="none" opacity="0.92">
                   {cab ? <CableBody d={cab.d} t={t} /> : (
                     <path d={`M ${P.x} ${P.y} Q ${(P.x + Q.x) / 2} ${Math.max(P.y, Q.y) + 30} ${Q.x} ${Q.y}`} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" />
                   )}
-                  {cab ? <CablePlug x={P.x} y={P.y} t={t} s={cab.sa} /> : <WireEnd x={P.x} y={P.y} t={t} />}
+                  {cab ? <CablePlug x={P.x} y={P.y} t={t} s={cab.sa} sock={P.sock} dir={P.dir} sw={P.sw} /> : <WireEnd x={P.x} y={P.y} t={t} />}
                   {cab ? <CablePlug x={Q.x} y={Q.y} t={t} s={cab.sb} loose /> : <Ferrule x={Q.x} y={Q.y} />}
                 </g>
               );
@@ -2666,16 +2668,30 @@ export default function BeckhoffConfigurator() {
 // plugs: the cable leaves each plug downwards and sags between them. Field
 // wiring keeps the orthogonal duct routing.
 const isCable = (t) => !!t?.conn;
+// plug scale at a point: free devices have small sockets
+const plugScale = (P) => (P.loose ? (P.free ? 0.62 : 1) : P.free ? 0.5 : P.ps || 1);
+// where the cable leaves the plug: from the boot facing the viewer (centre of
+// a front socket), sideways out of an angled EC slot, or below a loose plug
+function cableExit(P, s) {
+  if (P.loose) return { x: P.x, y: P.y + 22 * s };
+  if (P.sock === "ang") return { x: P.x + P.dir * (P.sw / 2 + 13), y: P.y + 1 };
+  if (P.sock === "jack") return { x: P.x + 5 * s, y: P.y + 1 * s };
+  if (P.sock === "jackL") return { x: P.x - 5 * s, y: P.y + 1 * s };
+  return { x: P.x, y: P.y };
+}
 function cableLook(t, A, B) {
   if (!isCable(t)) return null;
-  const sa = A.free ? 0.62 : 1, sb = B.free ? 0.62 : 1;
-  const ya = A.y + 22 * sa, yb = B.y + 22 * sb;
-  const dist = Math.hypot(B.x - A.x, B.y - A.y);
-  const k = Math.min(170, 24 + dist * 0.3);
+  const sa = plugScale(A), sb = plugScale(B);
+  const a = cableExit(A, sa), b = cableExit(B, sb);
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  const k = Math.min(170, 30 + dist * 0.3);
   // ports above one another: bow the loop sideways so it doesn't lie on itself
-  const bow = Math.max(0, 46 - Math.abs(B.x - A.x)) * (B.x >= A.x ? 1 : -1);
-  const d = `M ${A.x} ${ya} C ${A.x + bow} ${ya + k}, ${B.x + bow} ${yb + k}, ${B.x} ${yb}`;
-  return { d, sa, sb, midY: (ya + yb) / 2 + 0.75 * k };
+  const bow = Math.max(0, 46 - Math.abs(b.x - a.x)) * (b.x >= a.x ? 1 : -1);
+  // an angled slot sends the cable out sideways first, then it hangs
+  const ca = A.sock === "ang" && !A.loose ? `${a.x + A.dir * 18} ${a.y + k * 0.6}` : `${a.x + bow} ${a.y + k}`;
+  const cb = B.sock === "ang" && !B.loose ? `${b.x + B.dir * 18} ${b.y + k * 0.6}` : `${b.x + bow} ${b.y + k}`;
+  const d = `M ${a.x} ${a.y} C ${ca}, ${cb}, ${b.x} ${b.y}`;
+  return { d, sa, sb, midY: (a.y + b.y) / 2 + 0.75 * k };
 }
 // the cable type a drag preview shows, before the far end is known
 function previewWireType(p) {
@@ -2722,9 +2738,10 @@ function Boot({ top, wTop, len, wEnd, fill }) {
 }
 // the plug seen from the front, sitting in its socket; loose = held at the
 // cursor while dragging (contacts showing)
-function CablePlug({ x, y, t, s = 1, loose = false }) {
+function CablePlug({ x, y, t, s = 1, loose = false, sock = "small", dir = 0, sw = 0 }) {
   const cw = t.w + 1.8;
   const boot = t.conn === "rj45" ? t.stroke : "#2A2D31";
+  if (!loose) return <SeatedPlug x={x} y={y} t={t} s={s} sock={sock} dir={dir} sw={sw} cw={cw} boot={boot} />;
   let body;
   if (t.conn === "rj45") {
     body = (
@@ -2773,6 +2790,85 @@ function CablePlug({ x, y, t, s = 1, loose = false }) {
   }
   return <g transform={`translate(${x} ${y}) scale(${s})`} pointerEvents="none">{body}</g>;
 }
+// boot seen end-on (pointing at the viewer): rounded block, ribs, the cable
+function BootEnd({ x, y, w, h, fill, cw }) {
+  return (
+    <g>
+      <rect x={x - w / 2} y={y - h / 2} width={w} height={h} rx={Math.min(w, h) * 0.28} fill={fill} stroke={shade(fill, 0.55)} strokeWidth="0.7" />
+      <rect x={x - w / 2 + 1.2} y={y - h / 2 + 1.2} width={w - 2.4} height={h * 0.3} rx={Math.min(w, h) * 0.2} fill="#FFFFFF" opacity="0.18" />
+      <circle cx={x} cy={y + h * 0.08} r={cw * 0.62} fill={shade(fill, 0.72)} stroke={shade(fill, 0.5)} strokeWidth="0.5" />
+    </g>
+  );
+}
+// a plug sitting in its socket. Front sockets: the clear plug body fills the
+// opening (latch in the latch step), the boot points at the viewer and the
+// cable leaves from it. Angled EC slot: the plug fills the slot and the boot
+// leaves sideways out of it.
+function SeatedPlug({ x, y, t, s, sock, dir, sw, cw, boot }) {
+  let g;
+  if (t.conn === "rj45" && (sock === "jack" || sock === "jackL")) {
+    g = (
+      <g transform={sock === "jackL" ? "scale(-1 1)" : undefined}>
+        <path d="M -8 -25 H 21 V 27 H -8 V 13 H -17 V -7 H -8 Z" fill="#DCE5EB" fillOpacity="0.94" stroke="#93A6B4" strokeWidth="0.7" strokeLinejoin="round" />
+        {Array.from({ length: 8 }).map((_, i) => <rect key={i} x="13" y={-14.6 + i * 4.2} width="6" height="1.3" rx="0.4" fill="#C9A23A" opacity="0.55" />)}
+        <rect x="-16" y="-6" width="9" height="18" rx="1.2" fill="#C8D4DD" stroke="#93A6B4" strokeWidth="0.6" />
+        <BootEnd x={5} y={1} w={20} h={40} fill={boot} cw={cw} />
+      </g>
+    );
+  } else if (t.conn === "rj45" && sock === "ang") {
+    const e = dir * sw / 2;
+    g = (
+      <g>
+        <rect x={-sw / 2 + 2.5} y="-5.5" width={sw - 5} height="11" rx="1" fill="#DCE5EB" fillOpacity="0.94" stroke="#93A6B4" strokeWidth="0.6" />
+        {Array.from({ length: 8 }).map((_, i) => <rect key={i} x={-sw / 2 + 5 + i * ((sw - 10) / 8)} y="-4.5" width="1" height="3" fill="#C9A23A" opacity="0.6" />)}
+        <path d={`M ${e} -7 L ${e + dir * 13} -3.5 L ${e + dir * 13} 5.5 L ${e} 8 Z`} fill={boot} stroke={shade(boot, 0.55)} strokeWidth="0.6" strokeLinejoin="round" />
+        {[0.35, 0.65].map((f) => <line key={f} x1={e + dir * 13 * f} x2={e + dir * 13 * f} y1={-7 + 3.5 * f + 0.8} y2={8 - 2.5 * f - 0.8} stroke="#000" strokeOpacity="0.22" strokeWidth="0.6" />)}
+      </g>
+    );
+  } else if (t.conn === "rj45") {
+    g = (
+      <g>
+        <rect x="-14" y="-10.5" width="28" height="15" rx="1" fill="#DCE5EB" fillOpacity="0.94" stroke="#93A6B4" strokeWidth="0.6" />
+        <rect x="-4" y="3.7" width="8" height="8" rx="0.8" fill="#C8D4DD" stroke="#93A6B4" strokeWidth="0.5" />
+        <BootEnd x={0} y={-2} w={20} h={14} fill={boot} cw={cw} />
+      </g>
+    );
+  } else if (t.conn === "m8" || t.conn === "m12") {
+    const r = t.conn === "m8" ? 7 : 9.5;
+    g = (
+      <g>
+        <circle r={r} fill="#A7ADB3" stroke="#5E6368" strokeWidth="0.9" />
+        <circle r={r - 1.4} fill="none" stroke="#7D8389" strokeWidth="1.6" strokeDasharray="1.2 1.2" />
+        <circle r={r * 0.62} fill={boot} stroke="#151719" strokeWidth="0.6" />
+        <circle r={cw * 0.55} fill={shade(t.stroke, 0.8)} />
+      </g>
+    );
+  } else if (t.conn === "sc" || t.conn === "vl") {
+    g = (
+      <g>
+        <rect x="-11" y="-8" width="22" height="15" rx="1.5" fill={t.conn === "sc" ? "#2F7FC1" : "#3A3F45"} stroke="#1E2124" strokeWidth="0.6" />
+        <BootEnd x={0} y={-0.5} w={13} h={11} fill={boot} cw={cw} />
+      </g>
+    );
+  } else if (t.conn === "dsub") {
+    g = (
+      <g>
+        <path d="M -15 -9 L 15 -9 L 12 9 L -12 9 Z" fill="#4A5058" stroke="#23272B" strokeWidth="0.7" />
+        <circle cx="-12.5" cy="0" r="1.6" fill="#C9CDD2" /><circle cx="12.5" cy="0" r="1.6" fill="#C9CDD2" />
+        <BootEnd x={0} y={0} w={16} h={12} fill={boot} cw={cw} />
+      </g>
+    );
+  } else {
+    g = (
+      <g>
+        <rect x="-9" y="-6" width="18" height="11" rx="1.5" fill="#B8BEC4" stroke="#6E747A" strokeWidth="0.7" />
+        <BootEnd x={0} y={-0.5} w={13} h={9} fill={boot} cw={cw} />
+      </g>
+    );
+  }
+  return <g transform={`translate(${x} ${y}) scale(${s})`} pointerEvents="none">{g}</g>;
+}
+
 // a bare wire end with its ferrule, held at the cursor while dragging
 function Ferrule({ x, y }) {
   return (
@@ -3040,7 +3136,7 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   );
 }
 
-function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, sim = null, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave, onDevHover }) {
+function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, sim = null, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
   const t = layout.pos[inst.uid];
   if (!t) return null;
   const { d, geom } = t;
@@ -3063,8 +3159,6 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       onClick={(e) => { if (!wireMode) { e.stopPropagation(); onSelect(); } }}
       onDoubleClick={(e) => { if (!wireMode && onDetail) { e.stopPropagation(); onDetail(); } }}
       onPointerDown={(e) => { if (!wireMode && onDragStart) onDragStart(e); }}
-      onMouseEnter={onDevHover ? () => onDevHover(uid) : undefined}
-      onMouseLeave={onDevHover ? () => onDevHover(null) : undefined}
       style={{ cursor: wireMode ? "crosshair" : "pointer" }}
       filter={selected ? "drop-shadow(0 10px 14px rgba(0,0,0,0.25))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.16))"}>
 
@@ -3132,8 +3226,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         if (p.port) {
           return (
             <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "grab" }}>
-              {isPending && <rect x={p.x - 21} y={p.y - 17} width="42" height="34" rx="3" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
-              <rect x={p.x - 20} y={p.y - 16} width="40" height="32" fill="transparent">
+              {isPending && <rect x={p.x - (p.sw ? p.sw / 2 + 2 : 21)} y={p.y - (p.sw ? 11 : 17)} width={p.sw ? p.sw + 4 : 42} height={p.sw ? 22 : 34} rx="3" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
+              <rect x={p.x - (p.sw ? p.sw / 2 : 20)} y={p.y - (p.sw ? 10 : 16)} width={p.sw || 40} height={p.sw ? 20 : 32} fill="transparent">
                 <title>{pointRole(d, p)}</title>
               </rect>
             </g>
@@ -3793,7 +3887,12 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
             </g>
           ))}
         </g>
-      ) : d.fbc ? <FbcPanel d={d} hx={hx} bx={bx} sim={sim} /> : (
+      ) : d.fbc ? <FbcPanel d={d} hx={hx} bx={bx} sim={sim} /> : d.ec ? (
+        <g>
+          <EcHousing d={d} hw={bx - 14} />
+          {ecSlots(d, W).map((q) => <g key={q.label}><EcSlot x={q.x} y={q.y} sw={q.sw} /><text x={q.x + q.sw / 2 + 3} y={q.y + 2} fill={M.txtDim} fontSize="5" fontFamily="system-ui">{q.label}</text></g>)}
+        </g>
+      ) : (
         <g>
           <text x={hx - 27} y="45" fill={M.txtDim} fontSize="5" fontFamily="system-ui">X1 IN</text>
           {d.m8 ? <M8Jack cx={hx} cy={83} la={la} /> : <RjJack cx={hx} cy={83} la={la} />}
@@ -3803,11 +3902,12 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
         </g>
       )}
       {!d.fbc && <EtherCatMark x={bx - 4} y={84} />}
-      {vprint(bx - 18, TH - 6, "BECKHOFF", 12, C.brand)}
-      {vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
+      {!d.ec && vprint(bx - 18, TH - 6, "BECKHOFF", 12, C.brand)}
+      {!d.ec && vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
       {/* the terminal block: the EL face, or the HD face on the EK18xx */}
       <g transform={`translate(${bx} 0)`}>
-        {d.ek18
+        {d.ec ? <EcBlock d={d} W={53} cols={[17, 36]} states={states} />
+          : d.ek18
           ? <Hd16Face d={d} W={53} cols={[17, 36]} states={hd} print={false} />
           : <El12Face d={d} W={53} cols={[17, 36]} states={states} print={false} />}
       </g>
@@ -3818,33 +3918,114 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
 // EC1100 / EC1110: the RJ45 sockets sit in an angled face, so the front view
 // can't show what is plugged in. Hovering the coupler shows this panel: each
 // port face-on, the plug and cable when connected, the far end and the cable.
+// EC1100 / EC1110 (push-in): the RJ45 sockets sit in a slanted face, so from
+// the front each shows as a narrow slot; a plug's boot leaves the slot
+// sideways (outwards) and the cable hangs from there.
+function ecSlots(d, W) {
+  if (d.extM7) {
+    const sw = (W - 67) * 0.66, x0 = 67 + (W - 67) * 0.12;
+    return [{ x: x0 + sw / 2, y: 66, label: "OUT", ang: 1, sw }];
+  }
+  const hw = W - 53 - 14, sw = hw * 0.6, x0 = 5;
+  return ["X1", "X2"].map((label, i) => ({ x: x0 + sw / 2, y: 132 + i * 24, label, ang: -1, sw }));
+}
+// one angled slot as seen from the front: frame, the two openings
+function EcSlot({ x, y, sw }) {
+  return (
+    <g>
+      <rect x={x - sw / 2} y={y - 8.5} width={sw} height="17" rx="2" fill="#B7BBBF" stroke="#8A8F94" strokeWidth="0.6" />
+      <rect x={x - sw / 2 + 2.5} y={y - 5.5} width={sw * 0.34} height="11" rx="1" fill="#17191B" />
+      <rect x={x - sw / 2 + 4.5 + sw * 0.34} y={y - 5.5} width={sw * 0.58 - 7} height="11" rx="1" fill="#17191B" />
+      <rect x={x - sw / 2 + 2.5} y={y - 5.5} width={sw - 5} height="2" fill="#000" opacity="0.35" />
+    </g>
+  );
+}
+// EC1100 left housing: horizontal brand + Data Matrix, the slanted port face
+function EcHousing({ d, hw }) {
+  const dots = [];
+  for (let cx = 0; cx < 9; cx++) for (let cy = 0; cy < 9; cy++)
+    if (cx === 0 || cy === 8 || ((cx * 7 + cy * 13 + cx * cy) % 5) < 2) dots.push(<rect key={`${cx}-${cy}`} x={hw - 15 + cx * 1.2} y={93 + cy * 1.2} width="1.2" height="1.2" fill="#1E2124" />);
+  return (
+    <g>
+      <text x="5" y="103" fill={C.brand} fontSize="10.5" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.2px" }}>BECKHOFF</text>
+      <rect x={hw - 16.5} y="91.5" width="13.8" height="13.8" fill="#FFFFFF" />
+      {dots}
+      {/* the slanted face that carries the sockets */}
+      <path d={`M 1 112 H ${hw - 1} V 176 L ${hw * 0.55} 300 H 1 Z`} fill="#CDD1D5" opacity="0.55" />
+      <path d={`M ${hw - 1} 176 L ${hw * 0.55} 300`} stroke="#AEB3B8" strokeWidth="0.8" />
+      <line x1="1" y1="112" x2={hw - 1} y2="112" stroke="#B5BABE" strokeWidth="0.7" />
+    </g>
+  );
+}
+// EC1100 push-in clamp block (as the photo): LED window, then 24 V / 0 V,
+// + +, − −, and an unlabelled fourth row; orange release over each opening
+// (the square openings are the points, drawn by TerminalG)
+function EcBlock({ d, W, cols, states }) {
+  return (
+    <g>
+      {[4.5, W - 25].map((x) => <rect key={x} x={x} y="6" width="20.5" height="13" rx="1" fill="#E6E8EA" stroke="#B9BDC1" strokeWidth="0.5" />)}
+      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
+      <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
+      {Array.from({ length: 8 }).map((_, s) => (
+        <rect key={s} x={cols[s % 2] - 7} y={27.5 + Math.floor(s / 2) * 8.5} width="14" height="5" rx="0.8" fill={states[s] ? "#46E36E" : "#4A4E52"} />
+      ))}
+      {[0, 1, 2, 3].map((row) => {
+        const g = EL12.gTop + row * EL12.gh;
+        return (
+          <g key={row}>
+            <rect x="3" y={g - 3} width={W - 6} height={EL12.gh - 4} rx="1.2" fill="#ECEEF0" stroke="#C3C7CB" strokeWidth="0.5" />
+            {cols.map((cx, ci) => {
+              const n = ci * 4 + row + 1, t = row < 3 ? el12Tab(d, n) : { hide: true }, by = g + EL12.entry - 17.5;
+              return (
+                <g key={ci}>
+                  {t.hide ? <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill="#DADDE0" stroke="#B4B8BC" strokeWidth="0.5" />
+                    : <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />}
+                  {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
+                  <rect x={cx - 6.5} y={by} width="13" height="7.5" rx="0.8" fill="#EE7A3C" stroke="#B9561F" strokeWidth="0.5" />
+                  <rect x={cx - 5.5} y={by + 3} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                  <rect x={cx - 5.5} y={by + 5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
+                  <circle cx={cx - 0.5} cy={by + 0.6} r="1.7" fill="#2B2E31" />
+                  <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{n}</text>
+                </g>
+              );
+            })}
+          </g>
+        );
+      })}
+      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="800" fontFamily="system-ui" textAnchor="middle">BECKHOFF</text>
+      <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="600" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
+    </g>
+  );
+}
+
 function EcPortsPanel({ x, y, id, ports }) {
-  const bw = 196, head = 34, row = 78, bh = head + ports.length * row + 6;
+  const bw = 210, head = 34, row = 70, bh = head + ports.length * row + 4;
   return (
     <g pointerEvents="none" filter="drop-shadow(0 6px 12px rgba(0,0,0,0.18))">
       <rect x={x} y={y} width={bw} height={bh} rx="7" fill="#FFFFFF" stroke="#C9CED3" strokeWidth="0.8" />
-      <text x={x + 10} y={y + 15} fill="#1C2126" fontSize="8.5" fontWeight="700" fontFamily="system-ui">{id} · ports</text>
-      <text x={x + 10} y={y + 26} fill="#6A737C" fontSize="6.6" fontFamily="system-ui">The sockets are angled; shown here face-on</text>
+      <text x={x + 10} y={y + 15} fill="#1C2126" fontSize="8.5" fontWeight="700" fontFamily="system-ui">{id} · ports, face-on</text>
+      <text x={x + 10} y={y + 26} fill="#6A737C" fontSize="6.6" fontFamily="system-ui">The sockets are angled in the housing; seen square here</text>
       {ports.map((pt, k) => {
-        const top = y + head + k * row, cx = x + 34, cy = top + 13.5;
+        const top = y + head + k * row, cx = x + 34, cy = top + row / 2 - 2, sc = 0.82;
         return (
           <g key={k}>
-            {k > 0 && <line x1={x + 8} x2={x + bw - 8} y1={top - 4} y2={top - 4} stroke="#E6E9EC" strokeWidth="0.8" />}
-            <Rj45 cx={cx} y={top} />
+            {pt.on && <rect x={x + 4} y={top - 2} width={bw - 8} height={row - 2} rx="5" fill="#EEF5FF" />}
+            {k > 0 && !pt.on && !ports[k - 1].on && <line x1={x + 8} x2={x + bw - 8} y1={top - 3} y2={top - 3} stroke="#E6E9EC" strokeWidth="0.8" />}
+            <g transform={`translate(${cx} ${cy}) scale(${sc})`}><RjJack cx={0} cy={0} /></g>
             {pt.cable && (
               <g>
-                <CableBody d={`M ${cx} ${cy + 22} L ${cx} ${top + row - 8}`} t={pt.cable} />
-                <CablePlug x={cx} y={cy} t={pt.cable} />
+                <CableBody d={`M ${cx + 5 * sc} ${cy} L ${cx + 5 * sc} ${top + row - 4}`} t={pt.cable} />
+                <CablePlug x={cx} y={cy} t={pt.cable} sock="jack" s={sc} />
               </g>
             )}
-            <text x={x + 64} y={top + 12} fill="#1C2126" fontSize="8" fontWeight="700" fontFamily="system-ui">{pt.label}</text>
+            <text x={x + 70} y={top + 20} fill="#1C2126" fontSize="8" fontWeight="700" fontFamily="system-ui">{pt.label}</text>
             {pt.cable ? (
               <g>
-                <text x={x + 64} y={top + 25} fill="#1C2126" fontSize="7" fontFamily="system-ui">→ {pt.peer}</text>
-                <text x={x + 64} y={top + 36} fill="#6A737C" fontSize="6.4" fontFamily="system-ui">{pt.cable.name.split(" — ")[0].slice(0, 30)}</text>
+                <text x={x + 70} y={top + 33} fill="#1C2126" fontSize="7" fontFamily="system-ui">→ {pt.peer}</text>
+                <text x={x + 70} y={top + 44} fill="#6A737C" fontSize="6.4" fontFamily="system-ui">{pt.cable.name.split(" — ")[0].slice(0, 30)}</text>
               </g>
             ) : (
-              <text x={x + 64} y={top + 25} fill="#8A939C" fontSize="7" fontFamily="system-ui">empty</text>
+              <text x={x + 70} y={top + 33} fill="#8A939C" fontSize="7" fontFamily="system-ui">empty</text>
             )}
           </g>
         );
@@ -3882,7 +4063,8 @@ function ExtensionFace({ d, W, sim = null }) {
       <EtherCatMark x={63} y={84} />
       {vprint(64, TH - 6, "BECKHOFF", 9, C.brand)}
       {vprint(76, TH - 8, d.id, 6.4, M.txt, true)}
-      {d.ejPorts === 0 ? <text x={67 + (W - 67) / 2} y="66" fill={M.txtDim} fontSize="5.6" textAnchor="middle" fontFamily="system-ui">EJ</text>
+      {d.ec ? ecSlots(d, W).map((q) => <EcSlot key={q.label} x={q.x} y={q.y} sw={q.sw} />)
+        : d.ejPorts === 0 ? <text x={67 + (W - 67) / 2} y="66" fill={M.txtDim} fontSize="5.6" textAnchor="middle" fontFamily="system-ui">EJ</text>
         : d.m8 ? <M8Jack cx={67 + (W - 67) / 2} cy={64} la={sim ? !!sim.alive : true} />
         : <RjJack cx={67 + (W - 67) / 2} cy={64} contacts="left" la={sim ? !!sim.alive : true} top="#C9B23A" bot="#46E36E" />}
     </g>
