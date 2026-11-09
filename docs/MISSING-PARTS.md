@@ -28,7 +28,7 @@ Checked the 341 EL / ED parts that had no pinout against the connection tables i
   - **Dummy terminals** (3): EL6071, EL6685, EL6685-0010 have no field clamps; they stay EtherCAT slaves with their E-bus current, clamps marked "no field connection".
 - **Second parser pass (2026-11-09):** the parser now reads number-first tables ("1 | TxD | …"), ranges ("1 - 8"), primed second blocks (1'–16'), side-by-side blocks (EL3783), one manual typo (EL4074 "Ch3 output | 2") and more channel names (Ch1 output, Ch1 U+, +R1, +TC1, I1, Relay 1, L1–L3). Result: 273 parts with channel roles (was 187), 37 named only (was 89). Of the 29 "picture only" parts, 26 now have tables (EL5151, EL5021, EL6021 were on pages the first crawl missed). EL3453 corrected to 24 mm 2 × 8. EL7037 corrected to 16 points. Sibling tables (flagged): EL7041-0052 ← EL7041, EL4172 ← EL4072, ED4172 ← ED4072, ED4174 ← ED4074.
   - **Still without a table:** EL4374, EL7041 page (picture only); EL6201 (hand-entered: "1 and 5" style table); EL3483 (4 clamps listed for an 8-point housing), EL5001-0012 and EL7031-0030 (8-clamp table for a 16-point housing), EL3314-0092 (manual lists -TC3 twice).
-- The 10 KL parts are left for the K-bus family.
+- **KL Bus Terminals (2026-11-09):** the 10 KL I/O parts (KL1104, KL1408, KL1418, KL2134, KL2408, KL2612, KL3054, KL3204, KL4004, KL4404) now carry the clamp tables from the Infosys KL manuals (page cited in each desc). KL4404 corrected to 0…10 V, K-bus 20 mA (the catalog had 0–20 mA, which is KL4414).
 
 ## Priority: standard base parts
 

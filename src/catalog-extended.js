@@ -42,7 +42,7 @@ export const EXTRA = [
   { id: "KL3054", brand: "beckhoff", name: "4-Ch AI 0-20mA", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, 0/4-20 mA, single-ended" },
   { id: "KL3204", brand: "beckhoff", name: "4-Ch AI RTD (PT100)", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, RTD / PT100 temperature" },
   { id: "KL4004", brand: "beckhoff", name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -100, desc: "KL analog output, 0-10 V" },
-  { id: "KL4404", brand: "beckhoff", name: "4-Ch AO 0-20mA", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -100, desc: "KL analog output, 0/4-20 mA" },
+  { id: "KL4404", brand: "beckhoff", name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -20, desc: "KL analog output, 0…10 V, 12 bit, single-ended (Infosys KL440x technical data: K-bus 20 mA)" },
   { id: "KL9100", brand: "beckhoff", name: "Potential Feed 24V", fn: "klbus", io: null, ch: 0, w: 12, ebus: 0, feed: true, pcFeed: true, desc: "KL power feed terminal — refresh 24 V power contacts" },
   { id: "KL9010", brand: "beckhoff", name: "KL Bus End Terminal", fn: "klbus", io: null, ch: 0, w: 12, ebus: 0, endcap: true, desc: "K-bus end terminal — required to close the terminal bus" },
 

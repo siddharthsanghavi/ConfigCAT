@@ -1036,6 +1036,35 @@ const x2 = (pins) => pins.flatMap((q) => [{ ...q }, { t: `${q.t || "clamp"} (2nd
   d.desc = d.desc.replace("Pinout not yet verified", "dummy terminal: no field clamps used; an EtherCAT slave that draws E-bus current");
 });
 
+// KL Bus Terminals (K-bus): clamp tables from the Beckhoff Infosys KL manuals
+// (kl1xxx, kl2xxx, kl26xx, kl304x_kl305x, kl320x, kl400x, kl440x_kl443x).
+{
+  const P = (n, c = "+24 V") => ({ r: "p24", t: `${c} · internally connected to terminal point ${n} and the positive power contact`, tab: "+" });
+  const G = (n) => ({ r: "gnd", t: `0 V · internally connected to terminal point ${n} and the negative power contact`, tab: "−" });
+  const io = (r, ch, t) => ({ r, ch, t });
+  const AG = (n, t = "GND · internal ground") => ({ r: "agnd", t: `${t} (internally connected to terminal point ${n})` });
+  const SH = (n) => ({ r: "pe", t: `Shield · PE / FE (internally connected to terminal point ${n})` });
+  const KL = {
+    KL1104: ["kl1xxx/7618894219", [io("di", 1, "Input 1"), P(6), G(7), io("di", 3, "Input 3"), io("di", 2, "Input 2"), P(2), G(3), io("di", 4, "Input 4")]],
+    KL1408: ["kl1xxx/7626993803", [1, 3, 5, 7, 2, 4, 6, 8].map((n) => io("di", n, `Input ${n}`))],
+    KL1418: ["kl1xxx/7626993803", [1, 3, 5, 7, 2, 4, 6, 8].map((n) => io("di", n, `Input ${n}`))],
+    KL2134: ["kl2xxx/7676353035", [io("do", 1, "Output 1"), P(6), G(7), io("do", 3, "Output 3"), io("do", 2, "Output 2"), P(2), G(3), io("do", 4, "Output 4")]],
+    KL2408: ["kl2xxx/7667538699", [1, 3, 5, 7, 2, 4, 6, 8].map((n) => io("do", n, `Output ${n}`))],
+    KL2612: ["kl26xx/7667583627", [io("do", 1, "Output 1 · relay 1 make contact"), { t: "Relay 1 · middle (common) contact" }, { t: "Relay 1 · break contact" }, { r: "pe", t: "⏚ · earth contact (internally connected to terminal point 8 and the ⏚ power contact)" },
+                                   io("do", 2, "Output 2 · relay 2 make contact"), { t: "Relay 2 · middle (common) contact" }, { t: "Relay 2 · break contact" }, { r: "pe", t: "⏚ · earth contact (internally connected to terminal point 4 and the ⏚ power contact)" }]],
+    KL3054: ["kl304x_kl305x/4339285515", [io("ai", 1, "+Input 1"), AG(6), io("ai", 3, "+Input 3"), AG(8), io("ai", 2, "+Input 2"), AG(2), io("ai", 4, "+Input 4"), AG(4)]],
+    KL3204: ["kl320x/1546072459", [io("ai", 1, "+R1 · input +R1"), { t: "-R1 · input −R1" }, io("ai", 3, "+R3 · input +R3"), { t: "-R3 · input −R3" }, io("ai", 2, "+R2 · input +R2"), { t: "-R2 · input −R2" }, io("ai", 4, "+R4 · input +R4"), { t: "-R4 · input −R4" }]],
+    KL4004: ["kl400x/4379086347", [io("ao", 1, "+Output 1"), AG(6), io("ao", 3, "+Output 3"), AG(8), io("ao", 2, "+Output 2"), AG(2), io("ao", 4, "+Output 4"), AG(4)]],
+    KL4404: ["kl440x_kl443x/4246503691", [io("ao", 1, "Output 1 · signal"), { r: "agnd", t: "0 V · output 1 ground" }, io("ao", 3, "Output 3 · signal"), { r: "agnd", t: "0 V · output 3 ground" }, io("ao", 2, "Output 2 · signal"), { r: "agnd", t: "0 V · output 2 ground" }, io("ao", 4, "Output 4 · signal"), { r: "agnd", t: "0 V · output 4 ground" }]],
+  };
+  for (const [id, [src, pins]] of Object.entries(KL)) {
+    const d = CATALOG.find((x) => x.id === id);
+    if (!d || d.pinout) continue;
+    d.pinout = pins;
+    d.desc = `${d.desc}. Clamps from Infosys /content/1033/${src}.html`;
+  }
+}
+
 // every catalog entry carries a manufacturer; unset → Beckhoff
 CATALOG.forEach((d) => { if (!d.brand) d.brand = "beckhoff"; });
 
