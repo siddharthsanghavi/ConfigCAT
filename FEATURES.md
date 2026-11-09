@@ -278,6 +278,10 @@ disconnects on the canvas to operate them; the docked panel holds the rest.
 ---
 
 ## Recently done
+- **KL LEDs after the product pictures**: older KL terminals (KL1104,
+  KL2134, KL3054, KL3204, KL4004, KL9100) have large round LEDs, newer ones
+  (KL1408, KL1418, KL2408, KL4404) eight small round LEDs on a grey panel;
+  KL9100 moved to the 12 mm feed face with its verified clamps.
 - **Drag-and-drop, realistic cables** with seated plugs (§4). EC1100 /
   EC1110 are drawn on the EK1100 / EK1110 faces with their push-in
   clamps (orange release buttons).

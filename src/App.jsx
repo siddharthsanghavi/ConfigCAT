@@ -3578,10 +3578,38 @@ function El12Face({ d, W, cols, states, print = true, n0 = 0, prime = false }) {
       {/* marker labels */}
       <rect x="4.5" y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
       <rect x={W - 25} y="6" width="20.5" height="13" rx="1" fill={elMark(d)[0]} stroke={elMark(d)[1]} strokeWidth="0.5" />
+      {/* KL housings: round LEDs, 2 per row, straight on the housing */}
+      {d.kled === 8 ? (
+        // newer KL: 8 small round LEDs on a grey panel
+        <g>
+          <rect x="7" y="24" width={W - 14} height="38" rx="1.2" fill="#BFC3C7" stroke="#A3A7AB" strokeWidth="0.5" />
+          {Array.from({ length: 8 }).map((_, s) => {
+            const on = states[s] || false, x = W / 2 + (s % 2 ? 4.6 : -4.6), y = 30 + Math.floor(s / 2) * 8.6;
+            return (
+              <g key={`kl${s}`}>
+                <circle cx={x} cy={y} r="3" fill={on ? "#46E36E" : "#7E8A72"} stroke="#6F746F" strokeWidth="0.4" />
+                {on && <circle cx={x} cy={y} r="3" fill="#46E36E" opacity="0.55" filter="blur(1.5px)" />}
+              </g>
+            );
+          })}
+        </g>
+      ) : d.kled ? Array.from({ length: d.kled }).map((_, s) => {
+        // older KL: large round LEDs straight on the housing
+        const on = states[s] || false, x = cols[s % 2], y = 31 + Math.floor(s / 2) * 14;
+        const red = d.kledC === "red", lit = red ? "#FF3B30" : "#46E36E";
+        return (
+          <g key={`kl${s}`}>
+            <circle cx={x} cy={y} r="6" fill="#B9BDC1" />
+            <circle cx={x} cy={y} r="5" fill={on ? lit : red ? "#6A2E2B" : "#4B403B"} stroke={on ? shade(lit, 0.75) : "#2E2723"} strokeWidth="0.5" />
+            {on && <circle cx={x} cy={y} r="5" fill={lit} opacity="0.55" filter="blur(2px)" />}
+          </g>
+        );
+      }) : <>
       {/* LED window: 4 rows × 2, slot s at row ⌊s/2⌋, column s mod 2 */}
       <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill={d.safety ? TS_Y.win : "#C9CCCF"} stroke={d.safety ? TS_Y.winEdge : "#999DA1"} strokeWidth="0.5" />
       <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
       {Array.from({ length: 8 }).map((_, s) => led(states[s] || false, cols[s % 2] - 7, 27.5 + Math.floor(s / 2) * 8.5, s))}
+      </>}
       {/* clamp rows */}
       {[0, 1].map((ci) => [0, 1, 2, 3].map((row) => {
         const n = n0 + ci * 4 + row + 1, g = EL12.gTop + row * EL12.gh, cx = cols[ci], t = el12Tab(d, n), ys = !!d.safety;

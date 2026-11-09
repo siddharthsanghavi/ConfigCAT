@@ -33,17 +33,17 @@ export const EXTRA = [
   // as rail terminals; ebus values represent K-bus load (approximate).
   // ==========================================================================
   { id: "BK1120", brand: "beckhoff", name: "EtherCAT Bus Coupler (K-bus)", fn: "klbus", io: null, ch: 0, w: 49, ebus: +2000, coupler: true, desc: "Couples KL Bus Terminals (K-bus) onto an EtherCAT network — X1 IN / X2 OUT" },
-  { id: "KL1104", brand: "beckhoff", name: "4-Ch DI 24V 3ms", fn: "klbus", io: "di", ch: 4, w: 12, ebus: -50, desc: "KL digital input, 24 V DC, 2/3-wire" },
-  { id: "KL1408", brand: "beckhoff", name: "8-Ch DI 24V 3ms", fn: "klbus", io: "di", ch: 8, w: 12, ebus: -60, desc: "KL digital input, 8-channel, 24 V DC" },
-  { id: "KL1418", brand: "beckhoff", name: "8-Ch DI 24V 0.2ms", fn: "klbus", io: "di", ch: 8, w: 12, ebus: -60, desc: "KL fast digital input, 8-channel" },
-  { id: "KL2134", brand: "beckhoff", name: "4-Ch DO 24V 0.5A", fn: "klbus", io: "do", ch: 4, w: 12, ebus: -60, upA: 2, desc: "KL digital output, 24 V DC, reverse-voltage protected" },
-  { id: "KL2408", brand: "beckhoff", name: "8-Ch DO 24V 0.5A", fn: "klbus", io: "do", ch: 8, w: 12, ebus: -70, upA: 4, desc: "KL digital output, 8-channel, 24 V DC" },
+  { id: "KL1104", brand: "beckhoff", kled: 4, name: "4-Ch DI 24V 3ms", fn: "klbus", io: "di", ch: 4, w: 12, ebus: -50, desc: "KL digital input, 24 V DC, 2/3-wire" },
+  { id: "KL1408", brand: "beckhoff", kled: 8, name: "8-Ch DI 24V 3ms", fn: "klbus", io: "di", ch: 8, w: 12, ebus: -60, desc: "KL digital input, 8-channel, 24 V DC" },
+  { id: "KL1418", brand: "beckhoff", kled: 8, name: "8-Ch DI 24V 0.2ms", fn: "klbus", io: "di", ch: 8, w: 12, ebus: -60, desc: "KL fast digital input, 8-channel" },
+  { id: "KL2134", brand: "beckhoff", kled: 4, name: "4-Ch DO 24V 0.5A", fn: "klbus", io: "do", ch: 4, w: 12, ebus: -60, upA: 2, desc: "KL digital output, 24 V DC, reverse-voltage protected" },
+  { id: "KL2408", brand: "beckhoff", kled: 8, name: "8-Ch DO 24V 0.5A", fn: "klbus", io: "do", ch: 8, w: 12, ebus: -70, upA: 4, desc: "KL digital output, 8-channel, 24 V DC" },
   { id: "KL2612", brand: "beckhoff", name: "2-Ch Relay Output", fn: "klbus", io: "do", ch: 2, w: 12, ebus: -70, relay: true, desc: "KL relay output, 2×NO, 230 V AC / 30 V DC" },
-  { id: "KL3054", brand: "beckhoff", name: "4-Ch AI 0-20mA", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, 0/4-20 mA, single-ended" },
-  { id: "KL3204", brand: "beckhoff", name: "4-Ch AI RTD (PT100)", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, RTD / PT100 temperature" },
-  { id: "KL4004", brand: "beckhoff", name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -100, desc: "KL analog output, 0-10 V" },
-  { id: "KL4404", brand: "beckhoff", name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -20, desc: "KL analog output, 0…10 V, 12 bit, single-ended (Infosys KL440x technical data: K-bus 20 mA)" },
-  { id: "KL9100", brand: "beckhoff", name: "Potential Feed 24V", fn: "klbus", io: null, ch: 0, w: 12, ebus: 0, feed: true, pcFeed: true, face: "EL9100", desc: "KL power feed terminal, 24 V DC, ≤ 10 A, green power LED (beckhoff.com: infeed 24 V, infeed 0 V, PE). Drawn on the EL9100 face; clamp numbers follow the EL9100 layout (2/6 +24 V, 3/7 0 V, 4/8 PE), not verified pin by pin for the KL9100" },
+  { id: "KL3054", brand: "beckhoff", kled: 4, kledC: "red", name: "4-Ch AI 0-20mA", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, 0/4-20 mA, single-ended" },
+  { id: "KL3204", brand: "beckhoff", kled: 4, kledC: "red", name: "4-Ch AI RTD (PT100)", fn: "klbus", io: "ai", ch: 4, w: 12, ebus: -65, desc: "KL analog input, RTD / PT100 temperature" },
+  { id: "KL4004", brand: "beckhoff", kled: 4, name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -100, desc: "KL analog output, 0-10 V" },
+  { id: "KL4404", brand: "beckhoff", kled: 8, name: "4-Ch AO 0-10V", fn: "klbus", io: "ao", ch: 4, w: 12, ebus: -20, desc: "KL analog output, 0…10 V, 12 bit, single-ended (Infosys KL440x technical data: K-bus 20 mA)" },
+  { id: "KL9100", brand: "beckhoff", name: "Potential Feed 24V", fn: "klbus", io: null, ch: 0, w: 12, ebus: 0, feed: true, pcFeed: true, face: "EL9100", kled: 4, desc: "KL power feed terminal, 24 V DC, ≤ 10 A. Clamps 1/5 not used, 2/6 +24 V, 3/7 0 V, 4/8 PE, each pair tied to its power contact; four round LEDs, green Power top right (verified from the product picture)" },
   { id: "KL9010", brand: "beckhoff", name: "KL Bus End Terminal", fn: "klbus", io: null, ch: 0, w: 12, ebus: 0, endcap: true, desc: "K-bus end terminal — required to close the terminal bus" },
 
   // ==========================================================================
