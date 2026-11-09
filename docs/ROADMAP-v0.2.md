@@ -496,6 +496,13 @@ photos or logo artwork go into the app (see CLAUDE.md conventions).
 - #25 **Spare-capacity report.**
 - #17 **Bandwidth / cycle-time estimate:** PLCSIM's `frameStats` already
   computes this; show it in topology.
+- **UI refresh across the whole tool.** The Beckhoff faces are redrawn
+  (M7); the app around them is not. Refresh the header and tool bar,
+  palette, inspector, rail and canvas chrome, the modals (topology, diagram,
+  projects, about), Simulate panels and validation messages to one design
+  system: type scale, spacing, colour tokens with a dark theme, icon set,
+  focus and hover states, and a narrow-window layout. Keep the screenshots
+  in docs/images (npm run shots) in step.
 - **Fieldbus coupler networks.** The EK9000 / EK9020 (Modbus TCP), EK9300 /
   EK9320 (PROFINET), EK9500 / EK9520 (EtherNet/IP), EK9160 (IoT) and EK3100
   (PROFIBUS) are in the catalog with their faces (board 08). They head a
