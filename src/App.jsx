@@ -598,8 +598,7 @@ function pointGeom(d) {
     return { W, pts, block: { cplr: true, bx: null, nf: "ekm" } };
   }
   if (d.extM7) {
-    if (d.ec) pts.push(...ecSlots(d, W).map((q) => ({ ...q, port: "rj45", size: 10 })));
-    else if (d.ejPorts !== 0) pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jackL" });
+    if (d.ejPorts !== 0) pts.push({ x: 67 + (W - 67) / 2, y: 64, label: "OUT", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jackL" });
     return { W, pts, block: { cplr: true, bx: 0 } };
   }
   if (d.jM7) {
@@ -616,7 +615,7 @@ function pointGeom(d) {
       }
     } else {
       FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
-        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true, sq: !!d.ec })));
+        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
     }
     // network ports after the clamps, as before, so saved wire indexes stay valid
     const hx = (bx - 14) / 2;
@@ -625,8 +624,6 @@ function pointGeom(d) {
     } else if (d.fiber) {
       pts.push({ x: hx - 8, y: 142, label: "X1", port: "fo", size: 10 });
       pts.push({ x: hx - 8, y: 254, label: "X2", port: "fo", size: 10 });
-    } else if (d.ec) {
-      pts.push(...ecSlots(d, W).map((q) => ({ ...q, port: "rj45", size: 10 })));
     } else {
       pts.push({ x: hx, y: 83, label: "X1", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jack" });
       pts.push({ x: hx, y: 189, label: "X2", port: d.m8 ? "m8net" : "rj45", size: 10, sock: "jack" });
@@ -689,7 +686,7 @@ function pointGeom(d) {
       }
     } else if (blk) {
       FEED_GROUPS.forEach((g, row) => g.labels.forEach((lb, col) =>
-        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true, sq: !!d.ec })));
+        pts.push({ x: c12[col], y: EL12.gTop + row * EL12.gh + EL12.entry, label: lb, size: 6.2, col, round: true })));
     }
     cxLayout(d, W).P.forEach((q) => pts.push({ x: q.x, y: q.y, label: q.label, port: q.kind, size: q.kind === "usb" ? 7 : 10 }));
     return { W, pts, block: { cplr: true, bx: blk ? bx : null, cols: c12, cxk: k } };
@@ -2246,20 +2243,6 @@ export default function BeckhoffConfigurator() {
                 </g>
               );
             })}
-
-            {/* EC1100 / EC1110: while the pointer is on the coupler, a panel
-                beside it shows its angled ports face-on (what is plugged in) */}
-            {hover && layout.pos[hover.uid]?.d.ec && layout.pos[hover.uid].geom.pts[hover.pt]?.port && (() => {
-              const hoverDev = hover.uid, t = layout.pos[hoverDev];
-              const ports = t.geom.pts.map((p, i) => {
-                if (!p.port) return null;
-                const w = wires.find((w2) => (w2.a.uid === hoverDev && w2.a.pt === i) || (w2.b.uid === hoverDev && w2.b.pt === i));
-                const far = w && (w.a.uid === hoverDev && w.a.pt === i ? w.b : w.a);
-                return { label: p.label, cable: w ? wireById[w.type] : null, peer: far ? ptName(far) : "", on: i === hover.pt };
-              }).filter(Boolean);
-              const q = t.geom.pts[hover.pt];
-              return <EcPortsPanel x={t.x + (t.d.extM7 ? q.x - 210 + q.sw / 2 : q.x - q.sw / 2)} y={t.y + q.y + 16} id={t.d.id} ports={ports} />;
-            })()}
 
             {/* free-placed components (PCs, panels, drives, field devices…) */}
             {free.map((f) => {
@@ -3887,12 +3870,7 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
             </g>
           ))}
         </g>
-      ) : d.fbc ? <FbcPanel d={d} hx={hx} bx={bx} sim={sim} /> : d.ec ? (
-        <g>
-          <EcHousing d={d} hw={bx - 14} />
-          {ecSlots(d, W).map((q) => <g key={q.label}><EcSlot x={q.x} y={q.y} sw={q.sw} /><text x={q.x + q.sw / 2 + 3} y={q.y + 2} fill={M.txtDim} fontSize="5" fontFamily="system-ui">{q.label}</text></g>)}
-        </g>
-      ) : (
+      ) : d.fbc ? <FbcPanel d={d} hx={hx} bx={bx} sim={sim} /> : (
         <g>
           <text x={hx - 27} y="45" fill={M.txtDim} fontSize="5" fontFamily="system-ui">X1 IN</text>
           {d.m8 ? <M8Jack cx={hx} cy={83} la={la} /> : <RjJack cx={hx} cy={83} la={la} />}
@@ -3902,12 +3880,11 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
         </g>
       )}
       {!d.fbc && <EtherCatMark x={bx - 4} y={84} />}
-      {!d.ec && vprint(bx - 18, TH - 6, "BECKHOFF", 12, C.brand)}
-      {!d.ec && vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
+      {vprint(bx - 18, TH - 6, "BECKHOFF", 12, C.brand)}
+      {vprint(bx - 5, TH - 8, d.id, 6.6, M.txt, true)}
       {/* the terminal block: the EL face, or the HD face on the EK18xx */}
       <g transform={`translate(${bx} 0)`}>
-        {d.ec ? <EcBlock d={d} W={53} cols={[17, 36]} states={states} />
-          : d.ek18
+        {d.ek18
           ? <Hd16Face d={d} W={53} cols={[17, 36]} states={hd} print={false} />
           : <El12Face d={d} W={53} cols={[17, 36]} states={states} print={false} />}
       </g>
@@ -3915,124 +3892,6 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
   );
 }
 
-// EC1100 / EC1110: the RJ45 sockets sit in an angled face, so the front view
-// can't show what is plugged in. Hovering the coupler shows this panel: each
-// port face-on, the plug and cable when connected, the far end and the cable.
-// EC1100 / EC1110 (push-in): the RJ45 sockets sit in a slanted face, so from
-// the front each shows as a narrow slot; a plug's boot leaves the slot
-// sideways (outwards) and the cable hangs from there.
-function ecSlots(d, W) {
-  if (d.extM7) {
-    const sw = (W - 67) * 0.66, x0 = 67 + (W - 67) * 0.12;
-    return [{ x: x0 + sw / 2, y: 66, label: "OUT", ang: 1, sw }];
-  }
-  const hw = W - 53 - 14, sw = hw * 0.6, x0 = 5;
-  return ["X1", "X2"].map((label, i) => ({ x: x0 + sw / 2, y: 132 + i * 24, label, ang: -1, sw }));
-}
-// one angled slot as seen from the front: frame, the two openings
-function EcSlot({ x, y, sw }) {
-  return (
-    <g>
-      <rect x={x - sw / 2} y={y - 8.5} width={sw} height="17" rx="2" fill="#B7BBBF" stroke="#8A8F94" strokeWidth="0.6" />
-      <rect x={x - sw / 2 + 2.5} y={y - 5.5} width={sw * 0.34} height="11" rx="1" fill="#17191B" />
-      <rect x={x - sw / 2 + 4.5 + sw * 0.34} y={y - 5.5} width={sw * 0.58 - 7} height="11" rx="1" fill="#17191B" />
-      <rect x={x - sw / 2 + 2.5} y={y - 5.5} width={sw - 5} height="2" fill="#000" opacity="0.35" />
-    </g>
-  );
-}
-// EC1100 left housing: horizontal brand + Data Matrix, the slanted port face
-function EcHousing({ d, hw }) {
-  const dots = [];
-  for (let cx = 0; cx < 9; cx++) for (let cy = 0; cy < 9; cy++)
-    if (cx === 0 || cy === 8 || ((cx * 7 + cy * 13 + cx * cy) % 5) < 2) dots.push(<rect key={`${cx}-${cy}`} x={hw - 15 + cx * 1.2} y={93 + cy * 1.2} width="1.2" height="1.2" fill="#1E2124" />);
-  return (
-    <g>
-      <text x="5" y="103" fill={C.brand} fontSize="10.5" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.2px" }}>BECKHOFF</text>
-      <rect x={hw - 16.5} y="91.5" width="13.8" height="13.8" fill="#FFFFFF" />
-      {dots}
-      {/* the slanted face that carries the sockets */}
-      <path d={`M 1 112 H ${hw - 1} V 176 L ${hw * 0.55} 300 H 1 Z`} fill="#CDD1D5" opacity="0.55" />
-      <path d={`M ${hw - 1} 176 L ${hw * 0.55} 300`} stroke="#AEB3B8" strokeWidth="0.8" />
-      <line x1="1" y1="112" x2={hw - 1} y2="112" stroke="#B5BABE" strokeWidth="0.7" />
-    </g>
-  );
-}
-// EC1100 push-in clamp block (as the photo): LED window, then 24 V / 0 V,
-// + +, − −, and an unlabelled fourth row; orange release over each opening
-// (the square openings are the points, drawn by TerminalG)
-function EcBlock({ d, W, cols, states }) {
-  return (
-    <g>
-      {[4.5, W - 25].map((x) => <rect key={x} x={x} y="6" width="20.5" height="13" rx="1" fill="#E6E8EA" stroke="#B9BDC1" strokeWidth="0.5" />)}
-      <rect x="6" y="23" width={W - 12} height="40" rx="1.5" fill="#C9CCCF" stroke="#999DA1" strokeWidth="0.5" />
-      <rect x="8" y="25" width={W - 16} height="36" rx="1" fill="#2C2F32" />
-      {Array.from({ length: 8 }).map((_, s) => (
-        <rect key={s} x={cols[s % 2] - 7} y={27.5 + Math.floor(s / 2) * 8.5} width="14" height="5" rx="0.8" fill={states[s] ? "#46E36E" : "#4A4E52"} />
-      ))}
-      {[0, 1, 2, 3].map((row) => {
-        const g = EL12.gTop + row * EL12.gh;
-        return (
-          <g key={row}>
-            <rect x="3" y={g - 3} width={W - 6} height={EL12.gh - 4} rx="1.2" fill="#ECEEF0" stroke="#C3C7CB" strokeWidth="0.5" />
-            {cols.map((cx, ci) => {
-              const n = ci * 4 + row + 1, t = row < 3 ? el12Tab(d, n) : { hide: true }, by = g + EL12.entry - 17.5;
-              return (
-                <g key={ci}>
-                  {t.hide ? <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill="#DADDE0" stroke="#B4B8BC" strokeWidth="0.5" />
-                    : <rect x={cx - 9.5} y={g} width="19" height="11" rx="1" fill={t.fill} stroke={t.edge} strokeWidth="0.5" />}
-                  {!t.hide && <text x={cx} y={g + 5.5 + t.fs * 0.36} fill={t.ink} fontSize={t.fs} fontWeight="700" fontFamily="system-ui" textAnchor="middle">{t.text}</text>}
-                  <rect x={cx - 6.5} y={by} width="13" height="7.5" rx="0.8" fill="#EE7A3C" stroke="#B9561F" strokeWidth="0.5" />
-                  <rect x={cx - 5.5} y={by + 3} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
-                  <rect x={cx - 5.5} y={by + 5} width="11" height="0.7" fill="#B9561F" opacity="0.7" />
-                  <circle cx={cx - 0.5} cy={by + 0.6} r="1.7" fill="#2B2E31" />
-                  <text x={cx + 9.1} y={by + 6.6} fill="#3A3F44" fontSize="4.6" fontWeight="500" fontFamily="system-ui" textAnchor="middle">{n}</text>
-                </g>
-              );
-            })}
-          </g>
-        );
-      })}
-      <text x={W / 2} y={TH - 20.5} fill="#2B2F33" fontSize="6.4" fontWeight="800" fontFamily="system-ui" textAnchor="middle">BECKHOFF</text>
-      <text x={W / 2} y={TH - 12} fill="#2B2F33" fontSize="5.6" fontWeight="600" fontFamily="ui-monospace,monospace" textAnchor="middle">{d.id}</text>
-    </g>
-  );
-}
-
-function EcPortsPanel({ x, y, id, ports }) {
-  const bw = 210, head = 34, row = 70, bh = head + ports.length * row + 4;
-  return (
-    <g pointerEvents="none" filter="drop-shadow(0 6px 12px rgba(0,0,0,0.18))">
-      <rect x={x} y={y} width={bw} height={bh} rx="7" fill="#FFFFFF" stroke="#C9CED3" strokeWidth="0.8" />
-      <text x={x + 10} y={y + 15} fill="#1C2126" fontSize="8.5" fontWeight="700" fontFamily="system-ui">{id} · ports, face-on</text>
-      <text x={x + 10} y={y + 26} fill="#6A737C" fontSize="6.6" fontFamily="system-ui">The sockets are angled in the housing; seen square here</text>
-      {ports.map((pt, k) => {
-        const top = y + head + k * row, cx = x + 34, cy = top + row / 2 - 2, sc = 0.82;
-        return (
-          <g key={k}>
-            {pt.on && <rect x={x + 4} y={top - 2} width={bw - 8} height={row - 2} rx="5" fill="#EEF5FF" />}
-            {k > 0 && !pt.on && !ports[k - 1].on && <line x1={x + 8} x2={x + bw - 8} y1={top - 3} y2={top - 3} stroke="#E6E9EC" strokeWidth="0.8" />}
-            <g transform={`translate(${cx} ${cy}) scale(${sc})`}><RjJack cx={0} cy={0} /></g>
-            {pt.cable && (
-              <g>
-                <CableBody d={`M ${cx + 5 * sc} ${cy} L ${cx + 5 * sc} ${top + row - 4}`} t={pt.cable} />
-                <CablePlug x={cx} y={cy} t={pt.cable} sock="jack" s={sc} />
-              </g>
-            )}
-            <text x={x + 70} y={top + 20} fill="#1C2126" fontSize="8" fontWeight="700" fontFamily="system-ui">{pt.label}</text>
-            {pt.cable ? (
-              <g>
-                <text x={x + 70} y={top + 33} fill="#1C2126" fontSize="7" fontFamily="system-ui">→ {pt.peer}</text>
-                <text x={x + 70} y={top + 44} fill="#6A737C" fontSize="6.4" fontFamily="system-ui">{pt.cable.name.split(" — ")[0].slice(0, 30)}</text>
-              </g>
-            ) : (
-              <text x={x + 70} y={top + 33} fill="#8A939C" fontSize="7" fontFamily="system-ui">empty</text>
-            )}
-          </g>
-        );
-      })}
-    </g>
-  );
-}
 
 // EK1110: 12 mm strip on the left (RUN LED, unused clamp openings), the
 // RJ45 housing on the right
@@ -4063,8 +3922,7 @@ function ExtensionFace({ d, W, sim = null }) {
       <EtherCatMark x={63} y={84} />
       {vprint(64, TH - 6, "BECKHOFF", 9, C.brand)}
       {vprint(76, TH - 8, d.id, 6.4, M.txt, true)}
-      {d.ec ? ecSlots(d, W).map((q) => <EcSlot key={q.label} x={q.x} y={q.y} sw={q.sw} />)
-        : d.ejPorts === 0 ? <text x={67 + (W - 67) / 2} y="66" fill={M.txtDim} fontSize="5.6" textAnchor="middle" fontFamily="system-ui">EJ</text>
+      {d.ejPorts === 0 ? <text x={67 + (W - 67) / 2} y="66" fill={M.txtDim} fontSize="5.6" textAnchor="middle" fontFamily="system-ui">EJ</text>
         : d.m8 ? <M8Jack cx={67 + (W - 67) / 2} cy={64} la={sim ? !!sim.alive : true} />
         : <RjJack cx={67 + (W - 67) / 2} cy={64} contacts="left" la={sim ? !!sim.alive : true} top="#C9B23A" bot="#46E36E" />}
     </g>
