@@ -15,6 +15,7 @@ import { EXTRA } from "./catalog-extended.js";
 import { ETG } from "./catalog-etg.js";
 import { MORE, MORE_GROUPS } from "./catalog-more.js";
 import { moreFaces, FACE_GROUPS } from "./catalog-more-faces.js";
+import { PINOUTS, HD_FIX } from "./catalog-pinouts.js";
 // TwinSAFE clamp roles (Beckhoff manuals, 2026): clk = the clock (test-pulse)
 // output that feeds a safe input's contact, "Input x+"; the safe input itself
 // is the "Input x−" clamp. usup = an output supply clamp (EK1960 Up1–Up6),
@@ -955,6 +956,17 @@ export const CATALOG = [
 ];
 // the last missed parts (new faces / feeds), built from the base parts above
 CATALOG.push(...moreFaces(Object.fromEntries(CATALOG.map((d) => [d.id, d]))));
+// clamp assignments from the Infosys pass, for parts without a hand-checked
+// pinout; HD_FIX parts are 16-point housings the catalog had drawn with 8
+CATALOG.forEach((d) => {
+  const p = PINOUTS[d.id];
+  if (!p || d.pinout || d.pins) return;
+  if (HD_FIX.includes(d.id)) d.hd = true;
+  d.pinout = p;
+  const note = "clamps from Infosys (connection table)";
+  d.desc = d.desc ? d.desc.replace("Pinout not yet verified", note) : note;
+  if (!/Infosys/.test(d.desc)) d.desc += `; ${note}`;
+});
 
 // every catalog entry carries a manufacturer; unset → Beckhoff
 CATALOG.forEach((d) => { if (!d.brand) d.brand = "beckhoff"; });

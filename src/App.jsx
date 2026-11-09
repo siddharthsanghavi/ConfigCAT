@@ -732,7 +732,7 @@ function pointGeom(d) {
     }
     return { W, pts, block: { cols: ce, ed: true } };
   }
-  if (hd && (d.pins || (!d.dist && d.fn !== "sys"))) {
+  if (hd && (d.pins || d.pinout || (!d.dist && d.fn !== "sys"))) {
     // HD terminals: the redrawn face (must mirror Hd16Face)
     const c16 = [W * 0.32, W * 0.68];
     for (let p = 0; p < 16; p++) {

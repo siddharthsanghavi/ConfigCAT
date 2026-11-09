@@ -12,6 +12,18 @@ Checked 2026-11-08 against the beckhoff.com EtherCAT Terminals tabular product o
 
 A part goes in only when its pinout can be verified (Infosys, the manual or the product picture), so this is a to-do list, not a promise. The **Priority** groups are the standard base parts. The variant groups mostly reuse an existing face and need only a catalog row once verified.
 
+## Infosys pinout pass (2026-11-08)
+
+Checked the 341 EL / ED parts that had no pinout against the connection tables in Infosys (144 EtherCAT Terminal manuals, 967 pages read). The clamp tables are in `src/catalog-pinouts.js`; each clamp keeps the manual's name and description as hover text, and gets a role only where the table states it (power contacts, PE, "Input n" / "Output n", analog signal ground).
+
+- **187 parts: full pinout with channel roles.**
+- **89 parts: every clamp named, but no channel roles**, because the manual's names are not "Input n" / "Output n" or the count differs from the catalog's channels. This covers RTD, thermocouple, bridge, power-measurement, relay and counter terminals. Their clamps no longer guess "clamp n = channel n".
+- **Housing corrected to 16 points** (12): EL2522, EL2595, EL2798, EL3174, EL3214, EL3255, EL5032, EL5042, EL5072, EL5112, EL5131, EL6224. The catalog drew them with 8 clamps. Wires saved on these parts keep their clamp numbers but move.
+- **Table did not match the housing, left for a manual check** (14): ED4074, EL3453-0020, EL3453-0100, EL3483, EL3483-0060, EL3783, EL3783-0100, EL4074, EL4078, EL5001-0011, EL5001-0012, EL5101-0010, EL5101-0011, EL5101-0090.
+- **Pinout only as a picture in Infosys** (29): EL3602, EL3602-0002, EL3602-0010, EL3612, EL3621-0020, EL3632, EL3681, EL3692, EL4172, EL4374, EL5021, EL5151, EL6001, EL6021, EL6021-0021, EL6070, EL6080, EL6201, EL7031, EL7031-0030, EL7037, EL7041-0052, EL7062, EL7201-0010, EL7201-9014, EL7211-9014, EL7221-9014, EL7332, EL8601-8411.
+- **No Infosys manual yet** (22, mostly new ED push-in parts): ED1808, ED2032, ED2034, ED2808, ED2838, ED3172, ED3174, ED3274, ED3361, ED3362, ED4172, ED4174, ED5002, ED6011, ED6012, ED6060, ED6781, ED7211-0010, ED8601-8411, EL6071, EL6685, EL6685-0010.
+- The 10 KL parts are left for the K-bus family.
+
 ## Priority: standard base parts
 
 | Group | Missing |
