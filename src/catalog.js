@@ -1004,6 +1004,15 @@ const ED_REF = {
   });
 }
 
+// Dummy terminals: no field wiring, but they are EtherCAT slaves and draw
+// E-bus current (EL6071 license key, EL6685 / -0010 reference clocks)
+["EL6071", "EL6685", "EL6685-0010"].forEach((id) => {
+  const d = CATALOG.find((x) => x.id === id);
+  if (!d || d.pinout) return;
+  d.pinout = Array.from({ length: 8 }, () => ({ t: "no field connection (dummy terminal)" }));
+  d.desc = d.desc.replace("Pinout not yet verified", "dummy terminal: no field clamps used; an EtherCAT slave that draws E-bus current");
+});
+
 // every catalog entry carries a manufacturer; unset → Beckhoff
 CATALOG.forEach((d) => { if (!d.brand) d.brand = "beckhoff"; });
 
