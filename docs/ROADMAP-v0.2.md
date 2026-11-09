@@ -496,7 +496,12 @@ photos or logo artwork go into the app (see CLAUDE.md conventions).
 - #25 **Spare-capacity report.**
 - #17 **Bandwidth / cycle-time estimate:** PLCSIM's `frameStats` already
   computes this; show it in topology.
-- **Realistic, drag-and-drop cables.** Cables should be easier to use and
+- **Realistic, drag-and-drop cables.** *Started 2026-11-09:* drag from any
+  point and drop on another (no wire tool), hanging connector cables with
+  RJ45 / M8 / M12 / fibre / PC / D-sub plugs, ferrule on field wire in the
+  hand. Still to do: drag an existing cable end to another port, highlight
+  the ports a cable fits while dragging, snap. Original brief:
+  Cables should be easier to use and
   look real: drag a cable from one port and drop it on another (no separate
   wire mode for the common case), drag an existing cable end to move it to a
   different port, and draw the cable ends as real connectors — an RJ45 plug

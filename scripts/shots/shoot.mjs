@@ -88,6 +88,30 @@ async function wire(page, [ua, pa], [ub, pb]) {
   }
 }
 
+// drag a cable with the real mouse, no wire tool: press on A, move, release
+// on B. hold = stop short of B with the button still down (for a shot of the
+// cable in the hand).
+async function centre(loc) {
+  await loc.scrollIntoViewIfNeeded();
+  const b = await loc.boundingBox();
+  return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+}
+async function drag(page, [ua, pa], [ub, pb], hold = false) {
+  await setWireMode(page, false);
+  const before = ((await readDoc(page)).wires || []).length;
+  const A = await centre(await point(page, ua, pa));
+  const B = await centre(await point(page, ub, pb));
+  await page.mouse.move(A.x, A.y);
+  await page.mouse.down();
+  const end = hold ? { x: A.x + (B.x - A.x) * 0.6, y: A.y + (B.y - A.y) * 0.6 + 40 } : B;
+  await page.mouse.move(end.x, end.y, { steps: 12 });
+  if (hold) return;
+  await page.mouse.up();
+  await page.waitForTimeout(60);
+  const after = ((await readDoc(page)).wires || []).length;
+  if (after !== before + 1) throw new Error(`drag ${ua}:${pa} -> ${ub}:${pb} made no cable`);
+}
+
 async function selectDevice(page, uid) {
   await setWireMode(page, false);
   await page.locator(`main [data-uid="${uid}"]`).first().dispatchEvent("click");
@@ -113,10 +137,10 @@ async function expand(page, titles) {
 // freeze the scene: no transient toast, no hover states, glowing/blinking
 // cables stopped on a chosen frame, and two painted frames before the capture.
 // (A toast is a fixed-position div holding bare text; modals hold elements.)
-async function steady(page, frame) {
+async function steady(page, frame, keepHover = false) {
   await page.waitForFunction(() => ![...document.querySelectorAll('div[style*="position: fixed"]')]
     .some((d) => !d.children.length && d.textContent.trim()), null, { timeout: 5000 });
-  await page.mouse.move(2, 2);
+  if (!keepHover) await page.mouse.move(2, 2);
   await page.evaluate((t) => {
     document.querySelectorAll("svg").forEach((s) => { try { s.pauseAnimations(); s.setCurrentTime(t); } catch {} });
   }, frame);
@@ -124,7 +148,7 @@ async function steady(page, frame) {
 }
 
 async function shoot(page, spec, scene, results) {
-  await steady(page, spec.frame ?? 0.4);
+  await steady(page, spec.frame ?? 0.4, spec.keepHover);
   const file = path.join(OUT, `${spec.name}.png`);
   const vp = page.viewportSize();
   let clip = spec.clip;
@@ -162,6 +186,16 @@ async function runStep(page, step, scene, results) {
     case "wire": return wire(page, arg[0], arg[1]);
     case "wires": for (const w of arg) await wire(page, w[0], w[1]); return;
     case "wireMode": return setWireMode(page, arg);
+    case "drag": return drag(page, arg[0], arg[1]);
+    // rest the real mouse on a device (hover panels, e.g. the EC1100 ports)
+    case "hover": {
+      const loc = page.locator(`main [data-uid="${arg}"]`).first();
+      await loc.scrollIntoViewIfNeeded();
+      const b = await loc.boundingBox();
+      await page.mouse.move(b.x + b.width * 0.25, b.y + b.height * 0.85);
+      return page.waitForTimeout(80);
+    }
+    case "dragHold": return drag(page, arg[0], arg[1], true);
     case "pending": // leave a wire half-made, so the shot shows the tool mid-use
       await setWireMode(page, true);
       return (await point(page, arg[0], arg[1])).dispatchEvent("pointerdown");

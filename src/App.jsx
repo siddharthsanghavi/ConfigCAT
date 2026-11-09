@@ -1209,6 +1209,9 @@ export default function BeckhoffConfigurator() {
   const [wireMode, setWireMode] = useState(false);
   const [pending, setPending] = useState(null);
   const [wireCursor, setWireCursor] = useState(null);
+  // drag a cable straight from one point to another (no wire tool needed)
+  const cableDragRef = useRef(null); // { a: { uid, pt }, sx, sy, moved }
+  const [cableCursor, setCableCursor] = useState(null);
   const [flash, setFlash] = useState(null);
   const flashRef = useRef(null);
   const showFlash = (msg) => {
@@ -1217,6 +1220,7 @@ export default function BeckhoffConfigurator() {
     flashRef.current = setTimeout(() => setFlash(null), 2600);
   };
   const [hover, setHover] = useState(null);
+  const [hoverDev, setHoverDev] = useState(null); // device under the pointer (EC port panel)
   const [showWires, setShowWires] = useState(true);
   const [copied, setCopied] = useState(false);
   const [q, setQ] = useState("");
@@ -1400,16 +1404,33 @@ export default function BeckhoffConfigurator() {
     setWiresW((w) => [...w, { id: `w${Date.now()}`, a, b, type, label: "" }]);
     showFlash(`✓ ${wireById[type].name}`);
   };
-  const pointDown = (uid, pt) => {
-    if (!wireMode) return;
-    if (!pending) { setPending({ uid, pt }); return; }
-    if (pending.uid === uid && pending.pt === pt) { setPending(null); setWireCursor(null); return; }
+  // returns true when the press was used (the caller then stops it bubbling
+  // up to the device, so the device does not start dragging)
+  const pointDown = (uid, pt, e) => {
+    if (!wireMode) {
+      if (simOn || !e) return false;
+      e.preventDefault(); // no text selection while the cable is in the hand
+      cableDragRef.current = { a: { uid, pt }, sx: e.clientX, sy: e.clientY, moved: false };
+      return true;
+    }
+    if (!pending) { setPending({ uid, pt }); return true; }
+    if (pending.uid === uid && pending.pt === pt) { setPending(null); setWireCursor(null); return true; }
     completeWire(pending, { uid, pt });
+    return true;
   };
   const pointUp = (uid, pt) => {
-    if (!wireMode || !pending) return;
-    if (pending.uid === uid && pending.pt === pt) return; // same point → click-click flow continues
+    if (!wireMode) {
+      const cd = cableDragRef.current;
+      if (!cd) return false;
+      cableDragRef.current = null; setCableCursor(null);
+      if (!cd.moved || (cd.a.uid === uid && cd.a.pt === pt)) return true;
+      completeWire(cd.a, { uid, pt });
+      return true;
+    }
+    if (!pending) return false;
+    if (pending.uid === uid && pending.pt === pt) return true; // same point → click-click flow continues
     completeWire(pending, { uid, pt });
+    return true;
   };
   const deleteWire = (id) => { setWiresW((w) => w.filter((x) => x.id !== id)); if (selWire === id) setSelWire(null); };
   const setWireLabel = (id, label) => setWiresW((w) => w.map((x) => (x.id === id ? { ...x, label } : x)));
@@ -1625,7 +1646,7 @@ export default function BeckhoffConfigurator() {
     const by = dragging ? freeVis.y : t.y;
     // duct = the y level just below this device where its wires may travel
     const duct = t.free ? by + t.geom.H + 24 : RAIL_TOP + t.ri * (TH + RAIL_GAP) + TH + 30;
-    return { x: bx + p.x, y: by + p.y, duct };
+    return { x: bx + p.x, y: by + p.y, duct, free: !!t.free };
   };
   const wiredPts = useMemo(() => {
     const s = new Set();
@@ -1778,6 +1799,13 @@ export default function BeckhoffConfigurator() {
     dragFreeRef.current = { uid, offX: x - f.x, offY: y - f.y, moved: false };
   };
   const onCanvasPointerMove = (e) => {
+    const cd = cableDragRef.current;
+    if (cd) {
+      if (!cd.moved && Math.hypot(e.clientX - cd.sx, e.clientY - cd.sy) < 5) return;
+      cd.moved = true;
+      setCableCursor(svgXY(e));
+      return;
+    }
     if (wireMode) {
       if (pending) setWireCursor(svgXY(e));
       return;
@@ -1797,6 +1825,12 @@ export default function BeckhoffConfigurator() {
     setDragVis({ uid: dr.uid, x, y, ...dropTarget(x, y, dr.uid) });
   };
   const endCanvasDrag = () => {
+    const cd = cableDragRef.current;
+    if (cd) {
+      cableDragRef.current = null; setCableCursor(null);
+      if (cd.moved) showFlash("Drop the cable on a connection point to plug it in");
+      return;
+    }
     const df = dragFreeRef.current;
     if (df) {
       dragFreeRef.current = null;
@@ -2144,7 +2178,8 @@ export default function BeckhoffConfigurator() {
                       onDragStart={simOn ? null : (e) => startDragTerm(inst.uid, e)}
                       onPointDown={pointDown} onPointUp={pointUp}
                       onHover={(u, i) => setHover({ uid: u, pt: i })}
-                      onLeave={() => setHover(null)} />
+                      onLeave={() => setHover(null)}
+                      onDevHover={setHoverDev} />
                   ))}
                   <BackplaneLayer rail={rail} y={y} layout={layout} fsoeActive={fsoeActive} />
                 </g>
@@ -2163,7 +2198,9 @@ export default function BeckhoffConfigurator() {
               const near = Math.max(A.y, B.y) + 14 + (wi % 6) * 5;
               const ductY = Math.min(near, Math.max(A.duct, B.duct) + (wi % 6) * 5);
               const r = 6 * Math.sign(B.x - A.x || 1);
-              const path = Math.abs(B.x - A.x) > 14
+              // connector cables hang from their plugs in a soft curve
+              const cab = cableLook(t, A, B);
+              const path = cab ? cab.d : Math.abs(B.x - A.x) > 14
                 ? `M ${A.x} ${A.y} L ${A.x} ${ductY - 6} Q ${A.x} ${ductY} ${A.x + r} ${ductY} L ${B.x - r} ${ductY} Q ${B.x} ${ductY} ${B.x} ${ductY - 6} L ${B.x} ${B.y}`
                 : `M ${A.x} ${A.y} L ${A.x} ${ductY} L ${B.x} ${ductY} L ${B.x} ${B.y}`;
               const isSel = selWire === w.id;
@@ -2186,7 +2223,7 @@ export default function BeckhoffConfigurator() {
                   )}
                   {iolink && <path d={path} fill="none" stroke="#4AA3FF" strokeWidth={t.w + 4} opacity="0.4" strokeLinecap="round" />}
                   {t.shield && <path d={path} fill="none" stroke="#5F656C" strokeWidth={t.w + 2} />}
-                  <path d={path} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" strokeLinejoin="round" />
+                  {cab ? <CableBody d={path} t={t} /> : <path d={path} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" strokeLinejoin="round" />}
                   {t.gnye && <path d={path} fill="none" stroke="#F2D703" strokeWidth={t.w} strokeLinecap="round" strokeDasharray="7 9" />}
                   {t.net === "fo" && <path d={path} fill="none" stroke="#FFFFFF" strokeWidth="1" strokeDasharray="5 5" opacity="0.8" />}
                   {iolink && (
@@ -2199,28 +2236,28 @@ export default function BeckhoffConfigurator() {
                       <animate attributeName="opacity" values="0.95;0.1;0.95" dur="1.1s" repeatCount="indefinite" />
                     </path>
                   )}
-                  <WireEnd x={A.x} y={A.y} t={t} />
-                  <WireEnd x={B.x} y={B.y} t={t} />
+                  {cab ? <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} /> : <WireEnd x={A.x} y={A.y} t={t} />}
+                  {cab ? <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} /> : <WireEnd x={B.x} y={B.y} t={t} />}
                   {w.label && (
-                    <text x={(A.x + B.x) / 2} y={ductY - 5} fill={C.ink} fontSize="10" textAnchor="middle"
+                    <text x={(A.x + B.x) / 2} y={cab ? cab.midY + 14 : ductY - 5} fill={C.ink} fontSize="10" textAnchor="middle"
                       style={{ paintOrder: "stroke", stroke: "#EDEFF1", strokeWidth: 4 }}>{w.label}</text>
                   )}
                 </g>
               );
             })}
 
-            {/* EC1100 / EC1110: cutouts over the angled RJ45 ports */}
-            {rails.flatMap((r) => r.items).map((inst) => {
-              const t = layout.pos[inst.uid];
-              if (!t?.d.ec) return null;
-              return t.geom.pts.map((p, i) => {
+            {/* EC1100 / EC1110: while the pointer is on the coupler, a panel
+                beside it shows its angled ports face-on (what is plugged in) */}
+            {hoverDev && layout.pos[hoverDev]?.d.ec && !layout.pos[hoverDev].free && (() => {
+              const t = layout.pos[hoverDev];
+              const ports = t.geom.pts.map((p, i) => {
                 if (!p.port) return null;
-                const A = absPoint(inst.uid, i); if (!A) return null;
-                const w = wires.find((w2) => (w2.a.uid === inst.uid && w2.a.pt === i) || (w2.b.uid === inst.uid && w2.b.pt === i));
-                const far = w && (w.a.uid === inst.uid && w.a.pt === i ? w.b : w.a);
-                return <EcCutout key={`${inst.uid}:${i}`} x={A.x} y={A.y} label={p.label} cable={w ? wireById[w.type] : null} peer={far ? ptName(far) : ""} />;
-              });
-            })}
+                const w = wires.find((w2) => (w2.a.uid === hoverDev && w2.a.pt === i) || (w2.b.uid === hoverDev && w2.b.pt === i));
+                const far = w && (w.a.uid === hoverDev && w.a.pt === i ? w.b : w.a);
+                return { label: p.label, cable: w ? wireById[w.type] : null, peer: far ? ptName(far) : "" };
+              }).filter(Boolean);
+              return <EcPortsPanel x={t.x + t.geom.W + 10} y={t.y + 6} id={t.d.id} ports={ports} />;
+            })()}
 
             {/* free-placed components (PCs, panels, drives, field devices…) */}
             {free.map((f) => {
@@ -2248,6 +2285,42 @@ export default function BeckhoffConfigurator() {
               return (
                 <line x1={P.x} y1={P.y} x2={wireCursor.x} y2={wireCursor.y}
                   stroke="#1C2126" strokeWidth="1.6" strokeDasharray="6 5" opacity="0.55" pointerEvents="none" />
+              );
+            })()}
+
+            {/* cables to free devices: drawn again above those devices, so the
+                plug sits in the device's socket instead of behind its body */}
+            {showWires && wires.map((w) => {
+              const t = wireById[w.type];
+              if (!isCable(t)) return null;
+              const A = absPoint(w.a.uid, w.a.pt), B = absPoint(w.b.uid, w.b.pt);
+              if (!A || !B || !(A.free || B.free)) return null;
+              const cab = cableLook(t, A, B);
+              return (
+                <g key={`top-${w.id}`} pointerEvents="none">
+                  <CableBody d={cab.d} t={t} />
+                  <CablePlug x={A.x} y={A.y} t={t} s={cab.sa} />
+                  <CablePlug x={B.x} y={B.y} t={t} s={cab.sb} />
+                </g>
+              );
+            })}
+
+            {/* a cable being dragged out of a point */}
+            {cableCursor && cableDragRef.current && (() => {
+              const P = absPoint(cableDragRef.current.a.uid, cableDragRef.current.a.pt);
+              const src = resolveEnd(cableDragRef.current.a);
+              if (!P || !src) return null;
+              const t = wireById[previewWireType(src.p)];
+              const Q = { x: cableCursor.x, y: cableCursor.y, free: P.free };
+              const cab = cableLook(t, P, Q);
+              return (
+                <g pointerEvents="none" opacity="0.92">
+                  {cab ? <CableBody d={cab.d} t={t} /> : (
+                    <path d={`M ${P.x} ${P.y} Q ${(P.x + Q.x) / 2} ${Math.max(P.y, Q.y) + 30} ${Q.x} ${Q.y}`} fill="none" stroke={t.stroke} strokeWidth={t.w} strokeLinecap="round" />
+                  )}
+                  {cab ? <CablePlug x={P.x} y={P.y} t={t} s={cab.sa} /> : <WireEnd x={P.x} y={P.y} t={t} />}
+                  {cab ? <CablePlug x={Q.x} y={Q.y} t={t} s={cab.sb} loose /> : <Ferrule x={Q.x} y={Q.y} />}
+                </g>
               );
             })()}
 
@@ -2588,6 +2661,128 @@ export default function BeckhoffConfigurator() {
 }
 
 // wire endpoint glyph — shows the connector type (RJ45/SC/VL plug, M8/M12 screw)
+// ---- realistic connector cables ------------------------------------------
+// Connector cables (RJ45, M8, M12, fibre, PC plugs, D-sub) hang from their
+// plugs: the cable leaves each plug downwards and sags between them. Field
+// wiring keeps the orthogonal duct routing.
+const isCable = (t) => !!t?.conn;
+function cableLook(t, A, B) {
+  if (!isCable(t)) return null;
+  const sa = A.free ? 0.62 : 1, sb = B.free ? 0.62 : 1;
+  const ya = A.y + 22 * sa, yb = B.y + 22 * sb;
+  const dist = Math.hypot(B.x - A.x, B.y - A.y);
+  const k = Math.min(170, 24 + dist * 0.3);
+  // ports above one another: bow the loop sideways so it doesn't lie on itself
+  const bow = Math.max(0, 46 - Math.abs(B.x - A.x)) * (B.x >= A.x ? 1 : -1);
+  const d = `M ${A.x} ${ya} C ${A.x + bow} ${ya + k}, ${B.x + bow} ${yb + k}, ${B.x} ${yb}`;
+  return { d, sa, sb, midY: (ya + yb) / 2 + 0.75 * k };
+}
+// the cable type a drag preview shows, before the far end is known
+function previewWireType(p) {
+  const k = String(p?.port || "");
+  if (!k) return "bu";
+  if (k.includes("m8")) return "ecm8";
+  if (k.includes("m12")) return "ecm12";
+  if (k === "fo") return "fog";
+  if (k.startsWith("dsub")) return "fbus";
+  if (k === "usb") return "usb";
+  if (k === "hdmi") return "hdmi";
+  if (k === "dp") return "dp";
+  if (k === "dvi") return "dvi";
+  return "cat5e";
+}
+const shade = (hex, f) => {
+  const n = parseInt(hex.slice(1), 16);
+  const c = (v) => Math.max(0, Math.min(255, Math.round(v * f)));
+  return `rgb(${c(n >> 16)},${c((n >> 8) & 255)},${c(n & 255)})`;
+};
+// round jacket: soft shadow, darker edge, the colour, a highlight
+function CableBody({ d, t }) {
+  const w = t.w + 1.8;
+  return (
+    <g>
+      <path d={d} fill="none" stroke="#000" strokeOpacity="0.16" strokeWidth={w + 2} strokeLinecap="round" transform="translate(1.6 2.2)" />
+      <path d={d} fill="none" stroke={shade(t.stroke, 0.62)} strokeWidth={w + 1.4} strokeLinecap="round" />
+      <path d={d} fill="none" stroke={t.stroke} strokeWidth={w} strokeLinecap="round" />
+      <path d={d} fill="none" stroke="#FFFFFF" strokeOpacity="0.32" strokeWidth={Math.max(1, w * 0.28)} strokeLinecap="round" transform={`translate(${-w * 0.22} 0)`} />
+    </g>
+  );
+}
+// boot / strain relief below a plug, narrowing into the cable
+function Boot({ top, wTop, len, wEnd, fill }) {
+  return (
+    <g>
+      <path d={`M ${-wTop / 2} ${top} L ${wTop / 2} ${top} L ${wEnd / 2} ${top + len} L ${-wEnd / 2} ${top + len} Z`} fill={fill} stroke={shade(fill, 0.6)} strokeWidth="0.6" />
+      {[0.35, 0.55, 0.75].map((f) => {
+        const hw = (wTop + (wEnd - wTop) * f) / 2 - 1;
+        return <line key={f} x1={-hw} x2={hw} y1={top + len * f} y2={top + len * f} stroke="#000" strokeOpacity="0.22" strokeWidth="0.6" />;
+      })}
+    </g>
+  );
+}
+// the plug seen from the front, sitting in its socket; loose = held at the
+// cursor while dragging (contacts showing)
+function CablePlug({ x, y, t, s = 1, loose = false }) {
+  const cw = t.w + 1.8;
+  const boot = t.conn === "rj45" ? t.stroke : "#2A2D31";
+  let body;
+  if (t.conn === "rj45") {
+    body = (
+      <g>
+        <rect x="-13" y="-11" width="26" height="20" rx="2" fill="#DCE6EC" fillOpacity="0.88" stroke="#8FA3B3" strokeWidth="0.7" />
+        {Array.from({ length: 8 }).map((_, i) => <rect key={i} x={-10.6 + i * 2.9} y="-9.6" width="1.4" height="5" fill="#C9A23A" />)}
+        <rect x="-5" y="1" width="10" height="6" rx="1" fill="#C5D2DB" stroke="#8FA3B3" strokeWidth="0.5" />
+        <Boot top={8} wTop={16} len={14} wEnd={cw + 1} fill={boot} />
+      </g>
+    );
+  } else if (t.conn === "m8" || t.conn === "m12") {
+    const r = t.conn === "m8" ? 7 : 9.5;
+    body = (
+      <g>
+        <circle r={r} fill="#A7ADB3" stroke="#5E6368" strokeWidth="0.9" />
+        <circle r={r - 1.4} fill="none" stroke="#7D8389" strokeWidth="1.6" strokeDasharray="1.2 1.2" />
+        <circle r={r * 0.45} fill="#2A2D31" />
+        {loose && [0, 1, 2, 3].map((i) => <circle key={i} cx={Math.cos(i * 1.57 + 0.78) * r * 0.24} cy={Math.sin(i * 1.57 + 0.78) * r * 0.24} r="0.8" fill="#C9A23A" />)}
+        <Boot top={r - 1} wTop={r * 1.3} len={14} wEnd={cw + 1} fill={boot} />
+      </g>
+    );
+  } else if (t.conn === "sc" || t.conn === "vl") {
+    body = (
+      <g>
+        <rect x="-11" y="-8" width="22" height="15" rx="1.5" fill={t.conn === "sc" ? "#2F7FC1" : "#3A3F45"} stroke="#1E2124" strokeWidth="0.6" />
+        <circle cx="-5" cy="-1" r="2.2" fill="#F2F4F5" /><circle cx="5" cy="-1" r="2.2" fill="#F2F4F5" />
+        <Boot top={7} wTop={12} len={14} wEnd={cw + 1} fill={boot} />
+      </g>
+    );
+  } else if (t.conn === "dsub") {
+    body = (
+      <g>
+        <path d="M -15 -9 L 15 -9 L 12 9 L -12 9 Z" fill="#4A5058" stroke="#23272B" strokeWidth="0.7" />
+        <circle cx="-12.5" cy="0" r="1.6" fill="#C9CDD2" /><circle cx="12.5" cy="0" r="1.6" fill="#C9CDD2" />
+        <Boot top={9} wTop={14} len={13} wEnd={cw + 1} fill={boot} />
+      </g>
+    );
+  } else {
+    body = (
+      <g>
+        <rect x="-9" y="-6" width="18" height="11" rx="1.5" fill="#B8BEC4" stroke="#6E747A" strokeWidth="0.7" />
+        <rect x="-6" y="-3.5" width="12" height="5" fill="#2A2D31" />
+        <Boot top={5} wTop={14} len={13} wEnd={cw + 1} fill={boot} />
+      </g>
+    );
+  }
+  return <g transform={`translate(${x} ${y}) scale(${s})`} pointerEvents="none">{body}</g>;
+}
+// a bare wire end with its ferrule, held at the cursor while dragging
+function Ferrule({ x, y }) {
+  return (
+    <g pointerEvents="none">
+      <rect x={x - 2} y={y - 7} width="4" height="7" rx="0.8" fill="#C9CDD2" stroke="#7B8187" strokeWidth="0.6" />
+      <rect x={x - 2.6} y={y} width="5.2" height="5" rx="1" fill="#E8781E" />
+    </g>
+  );
+}
+
 function WireEnd({ x, y, t }) {
   if (t.conn === "rj45" || t.conn === "sc" || t.conn === "vl" || t.conn === "plug") {
     return <rect x={x - 4} y={y - 3} width="8" height="6" rx="1" fill="#2B2F33" stroke="#C9CDD2" strokeWidth="0.8" />;
@@ -2845,7 +3040,7 @@ function BackplaneLayer({ rail, y, layout, fsoeActive }) {
   );
 }
 
-function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, sim = null, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave }) {
+function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powered = true, sim = null, dragging, onSelect, onDetail, onDragStart, onPointDown, onPointUp, onHover, onLeave, onDevHover }) {
   const t = layout.pos[inst.uid];
   if (!t) return null;
   const { d, geom } = t;
@@ -2868,6 +3063,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       onClick={(e) => { if (!wireMode) { e.stopPropagation(); onSelect(); } }}
       onDoubleClick={(e) => { if (!wireMode && onDetail) { e.stopPropagation(); onDetail(); } }}
       onPointerDown={(e) => { if (!wireMode && onDragStart) onDragStart(e); }}
+      onMouseEnter={onDevHover ? () => onDevHover(uid) : undefined}
+      onMouseLeave={onDevHover ? () => onDevHover(null) : undefined}
       style={{ cursor: wireMode ? "crosshair" : "pointer" }}
       filter={selected ? "drop-shadow(0 10px 14px rgba(0,0,0,0.25))" : "drop-shadow(0 2px 4px rgba(0,0,0,0.16))"}>
 
@@ -2924,8 +3121,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
       {geom.pts.map((p, i) => {
         const isPending = pending && pending.uid === uid && pending.pt === i;
         const ptHandlers = {
-          onPointerDown: (e) => { if (wireMode) { e.stopPropagation(); onPointDown(uid, i); } },
-          onPointerUp: (e) => { if (wireMode) { e.stopPropagation(); onPointUp(uid, i); } },
+          onPointerDown: (e) => { if (onPointDown(uid, i, e)) e.stopPropagation(); },
+          onPointerUp: (e) => { if (onPointUp(uid, i)) e.stopPropagation(); },
           onMouseEnter: () => onHover(uid, i),
           onMouseLeave: onLeave,
         };
@@ -2934,7 +3131,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         const ptData = { "data-pt": i, "data-label": p.label };
         if (p.port) {
           return (
-            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "grab" }}>
               {isPending && <rect x={p.x - 21} y={p.y - 17} width="42" height="34" rx="3" fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
               <rect x={p.x - 20} y={p.y - 16} width="40" height="32" fill="transparent">
                 <title>{pointRole(d, p)}</title>
@@ -2944,7 +3141,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         }
         if (p.bare) {
           return (
-            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "grab" }}>
               {isPending && <circle cx={p.x} cy={p.y} r={p.r + 3} fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
               <circle cx={p.x} cy={p.y} r={p.r} fill="transparent"><title>{pointRole(d, p)}</title></circle>
             </g>
@@ -2952,7 +3149,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
         }
         if (p.round) {
           return (
-            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "grab" }}>
               {p.sq ? <PushIn x={p.x} y={p.y} hl={isPending} /> : p.plug ? <PlugHole x={p.x} y={p.y} hl={isPending} /> : <RoundClamp x={p.x} y={p.y} r={p.r} hl={isPending} ys={p.ys} />}
               <rect x={p.x - (p.plug ? 7 : p.sq ? 8 : p.r ? 7.5 : 9.5)} y={p.y - (p.plug ? 5.5 : p.sq ? 18.5 : p.r ? 15.5 : 27)} width={p.plug ? 22 : p.sq ? 16 : p.r ? 15 : 19} height={p.plug ? 11 : p.sq ? 26 : p.r ? 22 : 36} fill="transparent">
                 <title>{pointRole(d, p)}</title>
@@ -2961,7 +3158,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
           );
         }
         return (
-          <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+          <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "grab" }}>
             <ClampUnit x={p.x} y={p.y} size={p.size} hl={isPending} />
             <rect x={p.x - 9.5} y={p.y - p.size * 2.2 - 3} width="19" height={p.size * 3.6 + 6} fill="transparent">
               <title>{pointRole(d, p)}</title>
@@ -3618,41 +3815,40 @@ function CouplerM7Face({ d, W, geom, sim = null }) {
   );
 }
 
-// EC1100 / EC1110: the RJ45 sockets are angled, so the front view can't
-// show what is plugged in. A side-view cutout sits over each port: the
-// tilted socket, the plug and cable when one is connected (cable colour),
-// and the far end (part · point). The cable leaves at the bottom centre,
-// where the wire on the canvas continues.
-function EcCutout({ x, y, label, cable, peer }) {
-  const bw = 112, top = y - 34, bh = 56, sx = x - 36, sy = y - 4;
+// EC1100 / EC1110: the RJ45 sockets sit in an angled face, so the front view
+// can't show what is plugged in. Hovering the coupler shows this panel: each
+// port face-on, the plug and cable when connected, the far end and the cable.
+function EcPortsPanel({ x, y, id, ports }) {
+  const bw = 196, head = 34, row = 78, bh = head + ports.length * row + 6;
   return (
-    <g pointerEvents="none">
-      <rect x={x - bw / 2} y={top} width={bw} height={bh} rx="5" fill="#F7F8F9" stroke="#59616A" strokeWidth="0.9" strokeDasharray="3 2" />
-      <text x={x - bw / 2 + 5} y={top + 9} fill="#3A4148" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{label} · cutout</text>
-      <text x={x + bw / 2 - 5} y={top + 9} fill="#6A737C" fontSize="5.6" textAnchor="end" fontFamily="system-ui">side view</text>
-      {/* housing wall and the socket, tilted 35° */}
-      <rect x={x - bw / 2 + 4} y={top + 13} width="9" height={bh - 17} fill="#C9CDD1" />
-      <g transform={`rotate(35 ${sx} ${sy})`}>
-        <rect x={sx - 12} y={sy - 8} width="24" height="16" rx="1.5" fill="#3A3E42" stroke="#1E2124" strokeWidth="0.6" />
-        <rect x={sx - 9} y={sy - 5} width="14" height="10" fill="#15171A" />
-        {cable && (
-          <g>
-            <rect x={sx - 6} y={sy - 5.5} width="26" height="11" rx="1.5" fill="#DDE7EE" fillOpacity="0.9" stroke="#8FA3B3" strokeWidth="0.6" />
-            <rect x={sx - 4} y={sy - 6.6} width="12" height="2" rx="0.6" fill="#8FA3B3" />
-            {[0, 1, 2, 3].map((k) => <rect key={k} x={sx - 5} y={sy - 4 + k * 2.4} width="5" height="1" fill="#C9A23A" />)}
-            <rect x={sx + 20} y={sy - 4} width="7" height="8" rx="1.5" fill={cable.stroke} />
+    <g pointerEvents="none" filter="drop-shadow(0 6px 12px rgba(0,0,0,0.18))">
+      <rect x={x} y={y} width={bw} height={bh} rx="7" fill="#FFFFFF" stroke="#C9CED3" strokeWidth="0.8" />
+      <text x={x + 10} y={y + 15} fill="#1C2126" fontSize="8.5" fontWeight="700" fontFamily="system-ui">{id} · ports</text>
+      <text x={x + 10} y={y + 26} fill="#6A737C" fontSize="6.6" fontFamily="system-ui">The sockets are angled; shown here face-on</text>
+      {ports.map((pt, k) => {
+        const top = y + head + k * row, cx = x + 34, cy = top + 13.5;
+        return (
+          <g key={k}>
+            {k > 0 && <line x1={x + 8} x2={x + bw - 8} y1={top - 4} y2={top - 4} stroke="#E6E9EC" strokeWidth="0.8" />}
+            <Rj45 cx={cx} y={top} />
+            {pt.cable && (
+              <g>
+                <CableBody d={`M ${cx} ${cy + 22} L ${cx} ${top + row - 8}`} t={pt.cable} />
+                <CablePlug x={cx} y={cy} t={pt.cable} />
+              </g>
+            )}
+            <text x={x + 64} y={top + 12} fill="#1C2126" fontSize="8" fontWeight="700" fontFamily="system-ui">{pt.label}</text>
+            {pt.cable ? (
+              <g>
+                <text x={x + 64} y={top + 25} fill="#1C2126" fontSize="7" fontFamily="system-ui">→ {pt.peer}</text>
+                <text x={x + 64} y={top + 36} fill="#6A737C" fontSize="6.4" fontFamily="system-ui">{pt.cable.name.split(" — ")[0].slice(0, 30)}</text>
+              </g>
+            ) : (
+              <text x={x + 64} y={top + 25} fill="#8A939C" fontSize="7" fontFamily="system-ui">empty</text>
+            )}
           </g>
-        )}
-      </g>
-      {cable ? (
-        <g>
-          <path d={`M ${sx + 20} ${sy + 16} Q ${x} ${sy + 18} ${x} ${top + bh}`} fill="none" stroke={cable.stroke} strokeWidth="4" strokeLinecap="round" />
-          <text x={x + bw / 2 - 5} y={top + 20} fill="#1C2126" fontSize="6" fontWeight="600" textAnchor="end" fontFamily="system-ui">→ {peer}</text>
-          <text x={x + bw / 2 - 5} y={top + 28} fill="#6A737C" fontSize="5.2" textAnchor="end" fontFamily="system-ui">{cable.name.replace(/^EtherCAT /, "").replace(/ \(.*/, "").slice(0, 18)}</text>
-        </g>
-      ) : (
-        <text x={x + bw / 2 - 5} y={top + 22} fill="#8A939C" fontSize="6" textAnchor="end" fontFamily="system-ui">empty</text>
-      )}
+        );
+      })}
     </g>
   );
 }
@@ -5823,10 +6019,10 @@ function FreeCompG({ inst, layout, selected, wireMode, pending, wired, sim = nul
         const isPending = pending && pending.uid === uid && pending.pt === i;
         return (
           <g key={i} data-pt={i} data-label={p.label}
-            onPointerDown={(e) => { if (wireMode) { e.stopPropagation(); onPointDown(uid, i); } }}
-            onPointerUp={(e) => { if (wireMode) { e.stopPropagation(); onPointUp(uid, i); } }}
+            onPointerDown={(e) => { if (onPointDown(uid, i, e)) e.stopPropagation(); }}
+            onPointerUp={(e) => { if (onPointUp(uid, i)) e.stopPropagation(); }}
             onMouseEnter={() => onHover(uid, i)} onMouseLeave={onLeave}
-            style={{ cursor: wireMode ? "crosshair" : "help" }}>
+            style={{ cursor: wireMode ? "crosshair" : "grab" }}>
             {p.port ? (
               <g>
                 <PortGlyph x={p.x} y={p.y} kind={p.port} label={p.label} />

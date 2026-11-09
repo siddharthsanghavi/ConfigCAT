@@ -109,6 +109,18 @@ and exporting documentation. Deliverable: **`Sids-EtherCAT-Configurator.html`**
 - **Feasibility enforced**: incompatible pairs (port↔clamp, RJ45↔fiber)
   are blocked; the inspector's "change cable" list shows only cables
   that physically fit.
+- **Drag-and-drop cables** (v0.2-dev): no wire tool needed — press on a
+  port or clamp, drag, and drop on another point; the cable is chosen as
+  above. The cable in the hand shows its plug (RJ45 / M8 / M12 / fibre /
+  PC plug) or a ferrule for field wire. The wire tool's click-click flow
+  still works.
+- **Realistic connector cables**: RJ45, M8, M12, fibre, PC and D-sub
+  cables hang in a soft curve from real plugs (clear RJ45 body with gold
+  contacts, latch and coloured boot; knurled M8 / M12 nuts) with a round
+  jacket; field wiring keeps the clean orthogonal routing below.
+- **EC1100 / EC1110 port panel**: their RJ45 sockets sit in an angled face,
+  so hovering the coupler shows each port face-on with what is plugged in,
+  the far end and the cable type. The angle does not change the routing.
 - **Cable color convention**: red = +24 V, black = 0 V, blue = 24 V
   signal, orange = AC, GN/YE = PE, gray = shielded analog/encoder.
 - **Highlighting**:
@@ -264,6 +276,8 @@ disconnects on the canvas to operate them; the docked panel holds the rest.
 ---
 
 ## Recently done
+- **Drag-and-drop, realistic cables** (§4) and the **EC1100 / EC1110 hover
+  port panel**.
 - **Simulate** (v0.2-dev, §11): PLCSIM's engine inside the configurator,
   with live I/O and LEDs.
 - **Fix: removing a rail** no longer drops the project name and every
