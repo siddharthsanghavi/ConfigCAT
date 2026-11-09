@@ -2,6 +2,12 @@
 
 Checked 2026-11-08 against the beckhoff.com EtherCAT Terminals tabular product overview (631 parts) and the Infosys EtherCAT Terminals manual list. 358 of the 631 are not in `src/catalog.js`. Embedded PCs were checked separately: all 64 are in (board 07).
 
+**Update (same day):** 162 of these are now in the app, in `src/catalog-more.js`. Their channels, width, E-bus current and housing come from each product page, and their faces use the existing 8-point, HD 16-point, 2 × 16, 2 × 8 and ED housings. They have no pinouts yet, so their clamps show numbers. Validation and Simulate assume clamp n = channel n only where the clamp count matches the channel count (`noSig` marks the others). Still to do (106):
+- Couplers: EK1100-0008, EK1101-0008, EK1110-0008/-0043/-0044, EK1122-0008, EKM1101, EC1100, EC1110, BK1150, BK1250, EK9000/9020/9160/9300/9320/9500/9520, EK3100.
+- Housings the app does not draw yet: flat-ribbon (EL1852, EL1862(-0010), EL1872(-0010), EL2872(-0010), EL2878-0005); D-sub (EL1262-0010, EM2042, ED6011-0009, ED6012-0009); EL-24 comm and measurement (EL6251, EL6254, EL6632–6634, EL6653, EL6689, EL6711-0010, EL6720, EL6733, EL6740-0010, EL6753, EL6754, EL6761, EL6861, the -0010 slaves, EL3008-0003/-0005, EL3475(-0200), EM3701/3702/3712); EL6072.
+- Need feed or fuse modelling: the EL922x ordering codes, EL9540-0010, EL9550-0010/-0012, EL9561, EL9562(-0015), ED9100/9110/9183/9184/9186/9188/9189/9410.
+- Others: EL7201-9014, EL7211-9014, EL7221-9014, EL8601-8411, ED8601-8411, EM7004. EL6233 and ED3274 are held back because their pages list no E-bus current.
+
 A part goes in only when its pinout can be verified (Infosys, the manual or the product picture), so this is a to-do list, not a promise. The **Priority** groups are the standard base parts. The variant groups mostly reuse an existing face and need only a catalog row once verified.
 
 ## Priority: standard base parts

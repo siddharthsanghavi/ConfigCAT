@@ -54,7 +54,8 @@ export function railPointRole(d, label) {
     const p = d.pinout[n - 1];
     return p && p.r ? { r: p.r, ch: p.ch, n: d.io === "mix" ? n : p.ch, to: p.to } : null;
   }
-  if (d.io && n <= d.ch) return { r: d.io, ch: n, n };
+  // no pinout: clamp n is channel n, unless the clamp count differs (noSig)
+  if (d.io && d.io !== "mix" && !d.noSig && n <= d.ch) return { r: d.io, ch: n, n };
   return null;
 }
 

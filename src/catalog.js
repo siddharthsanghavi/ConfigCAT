@@ -13,6 +13,7 @@
  */
 import { EXTRA } from "./catalog-extended.js";
 import { ETG } from "./catalog-etg.js";
+import { MORE, MORE_GROUPS } from "./catalog-more.js";
 // TwinSAFE clamp roles (Beckhoff manuals, 2026): clk = the clock (test-pulse)
 // output that feeds a safe input's contact, "Input x+"; the safe input itself
 // is the "Input x−" clamp. usup = an output supply clamp (EK1960 Up1–Up6),
@@ -946,6 +947,7 @@ export const CATALOG = [
   { id: "MURR-MIRO-SAFE", brand: "murr", name: "MIRO SAFE+ Safety Relay", fn: "fld", free: true, kind: "box", fw: 44, fh: 108, io: null, ch: 0, w: 0, ebus: 0, safety: true, ioconn: 2, desc: "Safety relay for E-stop / guard, hardwired" },
 
   // bulk expansion (power sources, KL / WAGO 750 terminals, deeper vendor lines)
+  ...MORE,
   ...EXTRA,
   // EtherCAT Technology Group product directory (generated — see scripts/gen-etg.py)
   ...ETG,
@@ -999,6 +1001,8 @@ const KIND_GROUP = {
   switch8: "net", conv: "net",
   ipc: "pc", panel: "pnl",
 };
+// parts from catalog-more.js whose palette group is not their fn
+GROUPS.forEach((g) => { if (MORE_GROUPS[g.key]) g.ids.push(...MORE_GROUPS[g.key]); });
 {
   const listed = new Set(GROUPS.flatMap((g) => g.ids));
   const byKey = Object.fromEntries(GROUPS.map((g) => [g.key, g]));

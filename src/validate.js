@@ -39,6 +39,7 @@ export function classifyPoint(d, label) {
   if (!Number.isFinite(n)) return null;
   if (d.pinout) return pinRole(d, n);
   // no verified pinout — only classify all-signal cases we are sure about
+  if (d.noSig) return null; // clamp count differs from the channel count
   if (d.io === "di" && n <= d.ch && d.ch >= 8) return "di";
   if (d.io === "do" && !d.relay && n <= d.ch && d.ch >= 8) return "do";
   return null;

@@ -1101,6 +1101,7 @@ function pointRole(d, p) {
       if (pi.r === "pe") return `Pt ${n} \u2014 PE`;
     }
   }
+  if (d.noSig || (d.io === "mix" && !d.pinout)) return `Pt ${n} — pinout not yet verified`;
   const aux = n % 2 ? "+24 V supply (source)" : "0 V return (sink)";
   if (d.io === "di") return n <= d.ch ? `Pt ${n} \u2014 digital input ${n} (signal sink)` : `Pt ${n} \u2014 ${aux}`;
   if (d.io === "do") return n <= d.ch ? `Pt ${n} \u2014 digital output ${n} (sources +24 V)` : `Pt ${n} \u2014 ${aux}`;
@@ -3080,7 +3081,7 @@ function pointChannelIdx(d, s) {
   const p = d.pinout?.[s];
   if (d.io === "mix") return p && SIGNAL_ROLES.includes(p.r) ? s : -1;
   if (d.pinout) return p && SIGNAL_ROLES.includes(p.r) ? p.ch - 1 : -1;
-  return d.io && s < d.ch ? s : -1;
+  return d.io && d.io !== "mix" && !d.noSig && s < d.ch ? s : -1;
 }
 
 // HD 16-point face (M7, confirmed on the EL1859 pilot). Rows mirror
