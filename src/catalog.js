@@ -324,7 +324,7 @@ export const CATALOG = [
   { id: "EL3318", name: "8-Ch Thermocouple HD",  fn: "ai", io: "ai", ch: 8, w: 12, ebus: -140, hd: true },
   { id: "EL3351", name: "1-Ch Resistor Bridge 16-bit", fn: "ai", io: "ai", ch: 1, w: 12, ebus: -140, desc: "Strain gauge / load cell" },
   { id: "EL3443", name: "3-Phase Power Measurement 24-bit", fn: "ai", io: "ai", ch: 3, w: 12, ebus: -140, desc: "480 V AC, extended power values" },
-  { id: "EL3453", name: "3-Phase Power Measurement 690V", fn: "ai", io: "ai", ch: 3, w: 12, ebus: -140 },
+  { id: "EL3453", name: "3-Phase Power Measurement 690V", fn: "ai", io: "ai", ch: 3, w: 24, ebus: -140, blk: "el2x8", desc: "24 mm, 2 × 8 clamps (current IL1–IN / IL1'–IN', voltage L1–N; Infosys)" },
   { id: "EL3602", name: "2-Ch AI ±10V 24-bit",   fn: "ai", io: "ai", ch: 2, w: 12, ebus: -200, desc: "High-precision measurement" },
   { id: "EL3612", name: "2-Ch AI 0/4-20mA 24-bit", fn: "ai", io: "ai", ch: 2, w: 12, ebus: -200 },
   { id: "EL3632", name: "2-Ch IEPE Condition Monitoring", fn: "ai", io: "ai", ch: 2, w: 12, ebus: -200, desc: "Accelerometer inputs, 50 ksps" },
@@ -991,6 +991,8 @@ const ED_REF = {
   ED2838: "EL2838", ED3174: "EL3174",
   ED3361: ["ED3361-0100", bridge(false)], ED3362: ["ED3362-0100", bridge(true)],
   ED3172: ["EL3172", "x2"], ED5002: ["EL5002", "x2"],
+  // no own table: the nearest sibling with the same housing and channel count
+  "EL7041-0052": "EL7041", EL4172: "EL4072", ED4172: "ED4072", ED4174: "ED4074",
 };
 // 8 EL clamps → 16 ED clamps: each clamp twice, columns kept (EL 1-4 → ED
 // 1-8, EL 5-8 → ED 9-16); the second of each pair carries no role
@@ -1008,8 +1010,19 @@ const x2 = (pins) => pins.flatMap((q) => [{ ...q }, { t: `${q.t || "clamp"} (2nd
     d.pinout = pins.map((q) => ({ ...q }));
     d.desc += dbl
       ? `; clamps from the ${src} Infosys table, each doubled for the 16-point ED housing (no ${id} manual yet; layout assumed)`
-      : `; clamps from the ${src} Infosys table (no ${id} manual yet; same clamp layout assumed)`;
+      : `; clamps from the ${src} Infosys table (no ${id} table found; same clamp layout assumed)`;
   });
+}
+
+// EL6201 AS-i master: Infosys lists the clamps in pairs ("1 and 5 | SCM")
+{
+  const d = CATALOG.find((x) => x.id === "EL6201");
+  if (d && !d.pinout) {
+    const t = ["SCM · configuration mode (bridge 1 and 5 briefly)", "ASi+ · AS-i + (brown), 2 and 6 connected internally",
+      "ASi− · AS-i − (blue), 3 and 7 connected internally", "SPM · protected mode (bridge 4 and 8 briefly)"];
+    d.pinout = [...t, ...t].map((x) => ({ t: x }));
+    d.desc = (d.desc || "").replace("Pinout not yet verified", "clamps from Infosys (AS interface connection table)");
+  }
 }
 
 // Dummy terminals: no field wiring, but they are EtherCAT slaves and draw
