@@ -57,6 +57,7 @@ Most of these share a face with a part we have.
 
 ## Separate housings (own family, later)
 
+- **Update 2026-11-09: the ELX and ELM families are now in the app** (`src/catalog-elxm.js`, generated from the beckhoff.com technical data; palette groups "ELX" and "ELM"). ELX = the EL / EL-24 housing in blue (ELX9560 48 mm Ex i supply with its own face, ELX9410, ELX9012); clamp layouts not verified (Infosys has no ELX manuals), flagged per part. ELM = a 30 mm metal housing drawn from the pictures: push-in plugs X1…X4 (channels split over columns, e.g. ELM3148 4 × 2 × 6), 4 mm sockets, BNC, LEMO, mini-TC sockets, the ELM72xx servo plugs; 2-pin AI plugs take pin 1 as + (assumed), other pin functions not verified. ELM9410 / ELX9410 E-bus supplies, ELM9012 / ELX9012 end covers.
 - **ELX, intrinsically safe (Ex i), blue housing, 32 parts:** ELX1052, ELX1054, ELX1058, ELX2002, ELX2008, ELX2792, ELX3152, ELX3158, ELX3181, ELX3184, ELX3202, ELX3204, ELX3252, ELX3312, ELX3314, ELX3351, ELX3632, ELX4154, ELX4181, ELX4184, ELX5151, ELX6233, ELX9012, ELX9410, ELX9560, and their -0090 variants.
 - **ELM measurement and servo, 58 parts:** ELM3002/3004, ELM3102/3104, ELM3142–3148, ELM3244/3246, ELM3344/3348, ELM3502/3504, ELM3542/3544, ELM3602/3604, ELM3702/3704 with their variants, ELM2642/2644/2742/2744 multiplexers, ELM7211/7212/7221/7222/7231 servo drives (-0010, -9016, -9018), ELM9012 and ELM9410.
 

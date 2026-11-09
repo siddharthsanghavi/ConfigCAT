@@ -40,6 +40,8 @@ const M = {
 };
 const FN = {
   di:   { c: "#F2B705", label: "Digital in" },
+  elx:  { c: "#2B8ACB", label: "ELX Ex i" },
+  elm:  { c: "#8E959C", label: "ELM metal" },
   do:   { c: "#E8503A", label: "Digital out" },
   ai:   { c: "#25A37A", label: "Analog in" },
   ao:   { c: "#2F80ED", label: "Analog out" },
@@ -113,7 +115,7 @@ const CAT_LABEL = {
   cplr: "Couplers & Junctions", epc: "Embedded PCs", pc: "Industrial PCs", pnl: "Panels & HMI",
   di: "Digital Input", do: "Digital Output", ai: "Analog Input", ao: "Analog Output",
   pos: "Position & Encoder", mot: "Motion Terminals", com: "Communication",
-  ed: "ED I/O (push-in)", saf: "TwinSAFE", sys: "System & Power Terminals",
+  ed: "ED I/O (push-in)", saf: "TwinSAFE", elx: "ELX · Intrinsically safe (Ex i)", elm: "ELM · Measurement & servo (metal)", sys: "System & Power Terminals",
   klbus: "KL Bus Terminals (K-bus)", w750: "WAGO 750 I/O",
   iobox: "IP67 I/O & IO-Link", drv: "Drives & Motors", sens: "Sensors",
   hmi: "Operators & Signaling", safe: "Safety Devices", pneu: "Pneumatics & Valves",
@@ -121,7 +123,7 @@ const CAT_LABEL = {
   pwr: "Power & Distribution", src: "Power Sources",
 };
 // controllers first, then rail I/O, then field devices, then supporting kit
-const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "ed", "pos", "mot", "com", "saf",
+const CAT_ORDER = ["cplr", "epc", "pc", "pnl", "di", "do", "ai", "ao", "ed", "pos", "mot", "com", "saf", "elx", "elm",
   "sys", "klbus", "w750", "iobox", "drv", "sens", "hmi", "safe", "pneu", "net", "sw", "pwr", "src"];
 // how many matched parts a search may auto-expand before the palette leaves the
 // company folders closed instead (1500-odd buttons per keystroke is not useful)
@@ -550,6 +552,17 @@ function pointGeom(d) {
   if (d.endcap) return { W, pts, block: { cap: true } };
   if (d.sep) return { W, pts, block: { sep: true } };
   if (d.blank) return { W, pts };
+  // ELM metal housing (30 mm): connectors on the left, LED strip on the right
+  if (d.elm) {
+    const L = elmLayout(d, W);
+    L.pts.forEach((q) => pts.push(q));
+    return { W, pts, block: { elm: L } };
+  }
+  // ELX9560 Ex i supply (48 mm): 24 V / 0 V input plug on top
+  if (d.exPs) {
+    ["+", "−"].forEach((lb, k) => pts.push({ x: 30 + k * 14, y: 46, label: lb, size: 5, round: true, plug: true }));
+    return { W, pts, block: { exps: true } };
+  }
   // TwinSAFE Logic (EL6910 / EL6930): eight clamps, all "not used, no function"
   if (d.fn === "saf" && !d.io) return { W, pts, block: { cols: [W * 0.32, W * 0.68], el12: true, logic: true } };
   // EK1960 compact controller (must mirror CompactFace): plugs X3 / X4 /
@@ -2086,6 +2099,12 @@ export default function BeckhoffConfigurator() {
               <linearGradient id="ybody" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0" stopColor={M.yL} /><stop offset="0.5" stopColor={M.y} /><stop offset="1" stopColor={M.yR} />
               </linearGradient>
+              <linearGradient id="xbody" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stopColor="#4FA6DE" /><stop offset="0.5" stopColor="#2B8ACB" /><stop offset="1" stopColor="#1F6FA6" />
+              </linearGradient>
+              <linearGradient id="mbody" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0" stopColor="#F2F3F4" /><stop offset="0.35" stopColor="#D9DCDF" /><stop offset="0.7" stopColor="#C6CACE" /><stop offset="1" stopColor="#A9AEB3" />
+              </linearGradient>
             </defs>
 
             {rails.map((rail, ri) => {
@@ -2833,7 +2852,7 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
   const W = geom.W;
   const uid = inst.uid;
   // TwinSAFE housings are yellow, except the EK1914 (grey, a yellow insert under its safe clamps)
-  const body = d.psu ? "url(#psbody)" : d.safety && !(d.coupler && !d.compact) ? "url(#ybody)" : "url(#tbody)";
+  const body = d.psu ? "url(#psbody)" : d.elx ? "url(#xbody)" : d.elm ? "url(#mbody)" : d.safety && !(d.coupler && !d.compact) ? "url(#ybody)" : "url(#tbody)";
   const hd16 = !!geom.block?.hd16, ed = !!geom.block?.ed;
   const cap = !!geom.block?.cap; // EL9011 / EL9012 end cover
   const sep = !!geom.block?.sep; // EL9080 separation terminal
@@ -2885,6 +2904,8 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
 
       {compact ? <CompactFace d={d} W={W} sim={sim} /> :
         geom.block?.nf ? <MoreFace d={d} W={W} geom={geom} sim={sim} /> :
+        geom.block?.elm ? <ElmFace d={d} W={W} L={geom.block.elm} sim={sim} /> :
+        geom.block?.exps ? <ExPsFace d={d} W={W} sim={sim} /> :
         d.coupler && cplr ? <CouplerM7Face d={d} W={W} geom={geom} sim={sim} /> :
         cplr && d.extM7 ? <ExtensionFace d={d} W={W} sim={sim} /> :
         cplr && d.c24 ? <Comm24Face d={d} W={W} sim={sim} /> :
@@ -2918,6 +2939,14 @@ function TerminalG({ inst, layout, selected, wireMode, pending, wiredPts, powere
               <rect x={p.x - 20} y={p.y - 16} width="40" height="32" fill="transparent">
                 <title>{pointRole(d, p)}</title>
               </rect>
+            </g>
+          );
+        }
+        if (p.bare) {
+          return (
+            <g key={i} {...ptHandlers} {...ptData} style={{ cursor: wireMode ? "crosshair" : "help" }}>
+              {isPending && <circle cx={p.x} cy={p.y} r={p.r + 3} fill="none" stroke="#D71920" strokeWidth="1.4" strokeDasharray="3 2" />}
+              <circle cx={p.x} cy={p.y} r={p.r} fill="transparent"><title>{pointRole(d, p)}</title></circle>
             </g>
           );
         }
@@ -4117,6 +4146,144 @@ function FbcPanel({ d, hx, bx, sim = null }) {
 }
 
 // faces for pointGeom's nf blocks
+// ELM layout (shared by pointGeom and ElmFace): plugs X1…Xn (push-in,
+// 2 / 4 / 6 pins, channels split over columns), 4 mm sockets, BNC, LEMO,
+// mini-TC sockets, the servo plugs or the E-bus supply plug
+function elmLayout(d, W) {
+  const e = d.elm, top = 30, bot = TH - 30, pts = [], plugs = [], socks = [];
+  const pin = (x, y, lb) => pts.push({ x, y, label: lb, size: 5, round: true, plug: true });
+  if (e.kind === "plug") {
+    const h = (bot - top) / e.plugs, pitch = Math.min(13, (h - 16) / e.pins);
+    for (let p = 0; p < e.plugs; p++) {
+      const y0 = top + p * h + (h - (e.pins * pitch + 8)) / 2, w = e.cols * 24 + 8;
+      plugs.push({ x: 16, y: y0, w, h: e.pins * pitch + 8, lab: `X${p + 1}`, rows: e.pins, pitch });
+      for (let c = 0; c < e.cols; c++) for (let k = 0; k < e.pins; k++) pin(16 + 12 + c * 24, y0 + 4 + k * pitch + pitch / 2, `X${p + 1}${e.cols > 1 ? "abcd"[c] : ""}.${k + 1}`);
+    }
+  } else if (e.kind === "drive") {
+    const tot = e.plugs.reduce((a, n) => a + n, 0), gap = 13;
+    const pitch = Math.min(13, (bot - top - 8 - e.plugs.length * (8 + gap)) / tot);
+    let y = top + 4;
+    e.plugs.forEach((n, p) => {
+      const last = p === e.plugs.length - 1, hh = n * pitch + 8;
+      if (last) y = bot - hh;
+      plugs.push({ x: 16, y, w: 32, h: hh, lab: `X${p + 1}`, rows: n, pitch });
+      for (let k = 0; k < n; k++) pin(16 + 12, y + 4 + k * pitch + pitch / 2, `X${p + 1}.${k + 1}`);
+      y += hh + gap;
+    });
+  } else if (e.kind === "feed") {
+    plugs.push({ x: 16, y: top + 4, w: 32, h: 34, lab: "X1", rows: 2, pitch: 13 });
+    ["+", "−"].forEach((lb, k) => pin(28, top + 8 + k * 13 + 6.5, lb));
+  } else {
+    const n = d.ch || 1, h = (bot - top) / n, cx = (W - 30) / 2;
+    for (let c = 0; c < n; c++) {
+      const y0 = top + c * h;
+      if (e.kind === "lab") {
+        [["+", 0.32, "#C8262B"], ["−", 0.72, "#2A2D30"]].forEach(([s2, f, col]) => {
+          socks.push({ kind: "lab", x: cx, y: y0 + h * f, col, lab: s2, ch: c + 1 });
+          pts.push({ x: cx, y: y0 + h * f, label: `X${c + 1}${s2}`, bare: true, r: 11 });
+        });
+      } else {
+        socks.push({ kind: e.kind, x: cx, y: y0 + h / 2, lab: `X${c + 1}` });
+        pts.push({ x: cx, y: y0 + h / 2, label: `X${c + 1}`, bare: true, r: e.kind === "minitc" ? 10 : 14 });
+      }
+    }
+  }
+  return { pts, plugs, socks, top, bot };
+}
+
+// ELM face (product pictures): silver metal housing, part number on top,
+// black connectors on the left, black LED strip with green LEDs on the right
+function ElmFace({ d, W, L, sim = null }) {
+  const run = sim ? sim.run || false : true;
+  const sx = W - 26, nLed = Math.max(2, Math.min(8, (d.ch || 1) + 1));
+  return (
+    <g>
+      <rect x="3" y="4" width={W - 6} height={TH - 8} rx="2" fill="none" stroke="#9CA1A6" strokeWidth="0.6" />
+      <path d={`M 9 14 V 8 H 15`} fill="none" stroke="#2B2F33" strokeWidth="1.6" />
+      <path d={`M 9 ${TH - 14} V ${TH - 8} H 15`} fill="none" stroke="#2B2F33" strokeWidth="1.6" />
+      <text x="20" y="20" fill="#2B2F33" fontSize="7" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
+      {/* LED strip */}
+      <rect x={sx} y="8" width="18" height={TH - 16} rx="1.5" fill="#202326" />
+      {Array.from({ length: 6 }).map((_, k) => <rect key={k} x={sx + 3} y={150 + k * 28} width="12" height="18" rx="1" fill="#2C3034" />)}
+      {Array.from({ length: nLed }).map((_, k) => (
+        <rect key={`l${k}`} x={sx + 4} y={26 + k * 15} width="10" height="6" rx="1" fill={k === 0 ? (run ? "#46E36E" : "#2E4A36") : sim ? "#2E4A36" : "#3FBF5F"} />
+      ))}
+      {/* push-in plugs */}
+      {L.plugs.map((pl) => (
+        <g key={pl.lab}>
+          <rect x={pl.x} y={pl.y} width={pl.w} height={pl.h} rx="1.5" fill="#26292C" stroke="#111315" strokeWidth="0.6" />
+          {Array.from({ length: pl.rows }).map((_, k) => (
+            <g key={k}>
+              {Array.from({ length: Math.max(1, Math.round((pl.w - 8) / 24)) }).map((__, c) => (
+                <rect key={c} x={pl.x + 18 + c * 24} y={pl.y + 4 + k * pl.pitch + pl.pitch / 2 - 2.5} width="5" height="5" rx="0.8" fill="#E08A1E" />
+              ))}
+              <text x={pl.x - 3} y={pl.y + 4 + k * pl.pitch + pl.pitch / 2 + 2} fill="#3A3F44" fontSize="5" textAnchor="end" fontFamily="system-ui">{k + 1}</text>
+            </g>
+          ))}
+          <text x={pl.x - 4} y={pl.y + pl.h + 7} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{pl.lab}</text>
+        </g>
+      ))}
+      {/* sockets */}
+      {L.socks.map((k, i) => (
+        <g key={i}>
+          {k.kind === "lab" && (
+            <g>
+              <circle cx={k.x} cy={k.y} r="11" fill={k.col} stroke="#111" strokeWidth="0.6" />
+              <circle cx={k.x} cy={k.y} r="6.5" fill="#B78B3E" stroke="#5A4520" strokeWidth="0.6" />
+              <circle cx={k.x} cy={k.y} r="3" fill="#1A1A1A" />
+              <text x={k.x - 20} y={k.y + 3} fill="#2B2F33" fontSize="9" fontWeight="700" textAnchor="middle" fontFamily="system-ui">{k.lab}</text>
+              {k.lab === "−" && <text x={k.x - 20} y={k.y + 20} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="system-ui" textAnchor="middle">X{k.ch}</text>}
+            </g>
+          )}
+          {k.kind === "bnc" && (
+            <g>
+              <circle cx={k.x} cy={k.y} r="15" fill="#C9CDD1" stroke="#6E7378" strokeWidth="0.8" />
+              <circle cx={k.x} cy={k.y} r="10" fill="#9EA4AA" stroke="#5A5F64" strokeWidth="0.6" />
+              <circle cx={k.x} cy={k.y} r="5" fill="#2A2D30" />
+              <circle cx={k.x} cy={k.y} r="1.6" fill="#D7B24A" />
+              <text x={k.x - 24} y={k.y + 22} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{k.lab}</text>
+            </g>
+          )}
+          {k.kind === "lemo" && (
+            <g>
+              <circle cx={k.x} cy={k.y} r="13" fill="#B9BEC3" stroke="#6E7378" strokeWidth="0.8" />
+              <circle cx={k.x} cy={k.y} r="8" fill="#2A2D30" />
+              <circle cx={k.x} cy={k.y - 11} r="1.8" fill="#D3262B" />
+              <text x={k.x - 24} y={k.y + 20} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{k.lab}</text>
+            </g>
+          )}
+          {k.kind === "minitc" && (
+            <g>
+              <rect x={k.x - 14} y={k.y - 7} width="28" height="14" rx="2" fill="#F2F3F4" stroke="#6E7378" strokeWidth="0.8" />
+              <rect x={k.x - 8} y={k.y - 2} width="5" height="4" fill="#2A2D30" /><rect x={k.x + 3} y={k.y - 2} width="5" height="4" fill="#2A2D30" />
+              <text x={k.x - 24} y={k.y + 3} fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="system-ui">{k.lab}</text>
+            </g>
+          )}
+        </g>
+      ))}
+      <text x="18" y={TH - 14} fill="#2B2F33" fontSize="8" fontWeight="800" fontFamily="system-ui" style={{ letterSpacing: "0.4px" }}>BECKHOFF</text>
+    </g>
+  );
+}
+
+// ELX9560 (picture): 48 mm blue Ex i supply, 24 V / 0 V input plug on top,
+// three LEDs, a raised centre section with the Ex mark
+function ExPsFace({ d, W, sim = null }) {
+  const run = sim ? sim.run || false : true;
+  return (
+    <g>
+      <rect x="18" y="34" width="40" height="24" rx="2" fill="#1A5F8E" stroke="#0E3F60" strokeWidth="0.6" />
+      <text x="20" y="30" fill="#FFFFFF" fontSize="5.6" fontWeight="700" fontFamily="system-ui">X1 24V 0V</text>
+      {[0, 1, 2].map((k) => <rect key={k} x={W / 2 - 36 + k * 16} y="70" width="10" height="5" rx="1" fill={k === 0 ? (run ? "#46E36E" : "#2E4A36") : "#46E36E"} />)}
+      <rect x={W * 0.42} y="96" width={W * 0.26} height={TH - 130} rx="3" fill="#2479B4" stroke="#1A5F8E" strokeWidth="0.6" />
+      <circle cx={W * 0.8} cy="170" r="20" fill="none" stroke="#10324A" strokeWidth="2.2" />
+      <text x={W * 0.8} y="177" fill="#10324A" fontSize="18" fontWeight="700" fontStyle="italic" textAnchor="middle" fontFamily="system-ui">Ex</text>
+      <text x="20" y={TH - 16} fill="#10324A" fontSize="7.4" fontWeight="800" fontFamily="system-ui">BECKHOFF</text>
+      <text x={W - 16} y={TH - 16} fill="#10324A" fontSize="6.4" fontWeight="700" textAnchor="end" fontFamily="ui-monospace,monospace">{d.id}</text>
+    </g>
+  );
+}
+
 function MoreFace({ d, W, geom, sim = null }) {
   const nf = geom.block.nf, run = sim ? sim.run || false : true;
   const T = (x, y, t, o = {}) => <text x={x} y={y} fill={o.c || "#3A3F44"} fontSize={o.fs || 6} fontWeight={o.fw || 600} fontFamily="system-ui" textAnchor={o.a || "start"}>{t}</text>;
@@ -4908,6 +5075,12 @@ function DiagramSvg({ dref, width, height, nodes, edges, layout, NODE_PAD, NODES
         </linearGradient>
         <linearGradient id="ybody" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0" stopColor={M.yL} /><stop offset="0.5" stopColor={M.y} /><stop offset="1" stopColor={M.yR} />
+        </linearGradient>
+        <linearGradient id="xbody" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#4FA6DE" /><stop offset="0.5" stopColor="#2B8ACB" /><stop offset="1" stopColor="#1F6FA6" />
+        </linearGradient>
+        <linearGradient id="mbody" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stopColor="#F2F3F4" /><stop offset="0.35" stopColor="#D9DCDF" /><stop offset="0.7" stopColor="#C6CACE" /><stop offset="1" stopColor="#A9AEB3" />
         </linearGradient>
       </defs>
       <text x={NODE_PAD} y="24" fontSize="12" fontWeight="700" fill={C.ink} fontFamily="system-ui">

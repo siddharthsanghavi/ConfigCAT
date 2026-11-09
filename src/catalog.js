@@ -14,6 +14,7 @@
 import { EXTRA } from "./catalog-extended.js";
 import { ETG } from "./catalog-etg.js";
 import { MORE, MORE_GROUPS } from "./catalog-more.js";
+import { ELXM, ELXM_GROUPS } from "./catalog-elxm.js";
 import { moreFaces, FACE_GROUPS } from "./catalog-more-faces.js";
 import { PINOUTS, HD_FIX } from "./catalog-pinouts.js";
 // TwinSAFE clamp roles (Beckhoff manuals, 2026): clk = the clock (test-pulse)
@@ -956,6 +957,7 @@ export const CATALOG = [
 ];
 // the last missed parts (new faces / feeds), built from the base parts above
 CATALOG.push(...moreFaces(Object.fromEntries(CATALOG.map((d) => [d.id, d]))));
+CATALOG.push(...ELXM); // ELX (Ex i) and ELM (metal housing) families
 // clamp assignments from the Infosys pass, for parts without a hand-checked
 // pinout; HD_FIX parts are 16-point housings the catalog had drawn with 8
 CATALOG.forEach((d) => {
@@ -1084,6 +1086,12 @@ const KIND_GROUP = {
 };
 // parts from catalog-more.js whose palette group is not their fn
 GROUPS.forEach((g) => { if (MORE_GROUPS[g.key]) g.ids.push(...MORE_GROUPS[g.key]); });
+{
+  const at = GROUPS.findIndex((g) => g.key === "saf") + 1;
+  GROUPS.splice(at, 0,
+    { key: "elx", title: "ELX · intrinsically safe (Ex i)", ids: ELXM_GROUPS.elx },
+    { key: "elm", title: "ELM · measurement & servo (metal)", ids: ELXM_GROUPS.elm });
+}
 GROUPS.forEach((g) => { if (FACE_GROUPS[g.key]) g.ids.push(...FACE_GROUPS[g.key]); });
 {
   const listed = new Set(GROUPS.flatMap((g) => g.ids));

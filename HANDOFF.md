@@ -115,6 +115,10 @@ npm run shots          # regenerate README screenshots (see below)
   off the EtherCAT bus. `d.isoOut` (EL9561 / EL9562): + / − on the passing
   power contacts, the isolated outputs unsolved. `noSig` = no clamp-to-channel
   guess.
+  ELX / ELM (`src/catalog-elxm.js`, generated): `d.elx` = blue body (`#xbody`)
+  on the normal EL faces; `d.elm` = 30 mm metal housing, `elmLayout()` gives
+  the points (plugs / sockets) and `ElmFace` draws them (`#mbody`); `p.bare`
+  points are hit areas over sockets the face draws. `d.exPs` = ELX9560 face.
 - Mixed terminals (`io: "mix"`, EL1859) list their channels from the
   pinout. `ioChannels(d)` in `sim/station.js` is the one source for a rail
   terminal's channels: `ch` numbers within a kind (In1, Out1), `n` keys the
