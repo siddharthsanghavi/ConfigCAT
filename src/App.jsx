@@ -575,7 +575,7 @@ function pointGeom(d) {
   }
   if (d.keyslot) return { W, pts, block: { el12: true, nf: "key" } };
   if (d.emod) {
-    ["24V", "0V"].forEach((lb, k) => pts.push({ x: W - 40, y: 262 + k * 16, label: lb, size: 5, round: true, plug: true, role: k ? "gnd" : "p24", tip: `${lb} — module supply` }));
+    ["24V", "0V"].forEach((lb, k) => pts.push({ x: 322 + k * 30, y: 310, label: lb, size: 5, round: true, plug: true, role: k ? "gnd" : "p24", tip: `${lb} — module supply` }));
     return { W, pts, block: { cplr: true, bx: null, nf: "emod" } };
   }
   if (d.ekm) {
@@ -4120,33 +4120,61 @@ function MoreFace({ d, W, geom, sim = null }) {
     );
   }
   if (nf === "emod") {
-    // EM7004 (picture): axis plugs X0–X3 (4 columns) and X4–X7 (2 columns),
-    // the orange 24 V / 0 V plug on the right
-    const big = (k) => ({ x: 18 + k * 112, y: 60, w: 100, h: 230, cols: 4, rows: 8, rp: 27.5, rh: 20 });
-    const small = (k) => ({ x: 470 + ((k - 4) % 2) * 66, y: k < 6 ? 60 : 176, w: 56, h: 100, cols: 2, rows: 5, rp: 18, rh: 12 });
+    // EM7004 (product picture): light grey module, eight white spring plugs
+    // in two rows (X0 / X1 IN and X2 / X3 OUT with four clamp columns, X4–X7
+    // with one column and a marking strip), screw flanges top and bottom, the
+    // orange X8 24 V / 0 V plug between the second and third columns
+    const btn = ["#A3A8AD", "#D3262B", "#D3262B", "#2C7BC0"];
+    const plug = (x, y, w, h, wide, key) => {
+      const cols = wide ? 4 : 1, rows = 11, cw = wide ? (w - 8) / 4 : 22, rp = (h - 10) / rows;
+      return (
+        <g key={key}>
+          <rect x={x + w / 2 - 9} y={y - 9} width="18" height="9" rx="1" fill="#2E3134" />
+          <circle cx={x + w / 2} cy={y - 4.5} r="3" fill="#C9CDD1" stroke="#7E8388" strokeWidth="0.5" />
+          <rect x={x + w / 2 - 9} y={y + h} width="18" height="9" rx="1" fill="#2E3134" />
+          <circle cx={x + w / 2} cy={y + h + 4.5} r="3" fill="#C9CDD1" stroke="#7E8388" strokeWidth="0.5" />
+          <rect x={x} y={y} width={w} height={h} rx="1.5" fill="#F4F5F6" stroke="#B9BDC1" strokeWidth="0.6" />
+          {Array.from({ length: cols * rows }).map((_, i) => {
+            const c = i % cols, r = Math.floor(i / cols), bx = x + 4 + c * cw, by = y + 5 + r * rp;
+            const col = wide ? (r % 2 ? "#BFC3C7" : btn[c]) : r === 0 ? "#D3262B" : r === rows - 1 ? "#2C7BC0" : "#BFC3C7";
+            return (
+              <g key={i}>
+                <rect x={bx + 1} y={by + 1} width={cw * 0.42} height={rp - 3} rx="0.6" fill="#3A3D40" />
+                <rect x={bx + cw * 0.5} y={by + 1.5} width={cw * 0.36} height={rp - 4} rx="0.6" fill={col} />
+              </g>
+            );
+          })}
+          {!wide && <rect x={x + 28} y={y + 4} width={w - 32} height={h - 8} rx="1" fill="#FFFFFF" stroke="#D5D8DB" strokeWidth="0.5" />}
+        </g>
+      );
+    };
+    const C4 = [[44, 99, true], [205, 97, true], [370, 58, false], [532, 60, false]];
     return (
       <g>
-        <rect x="0.5" y="0" width={W - 1} height={TH} rx="2" fill="url(#cplrbody)" />
-        <rect x="12" y="2" width="80" height="7" rx="1" fill="#F0961C" stroke="#BF730E" strokeWidth="0.5" />
-        {[0, 1, 2, 3, 4, 5, 6, 7].map((k) => {
-          const g = k < 4 ? big(k) : small(k);
-          return (
-            <g key={k}>
-              {T(g.x, g.y - 6, `X${k}`)}
-              <rect x={g.x} y={g.y} width={g.w} height={g.h} rx="2" fill="#3A3D40" stroke="#1E2022" strokeWidth="0.6" />
-              {Array.from({ length: g.cols * g.rows }).map((_, i) => {
-                const c = i % g.cols, r = Math.floor(i / g.cols), cw = (g.w - 12) / g.cols;
-                return <rect key={i} x={g.x + 6 + c * cw + 1} y={g.y + 8 + r * g.rp} width={cw - 2} height={g.rh} rx="1" fill="#1A1C1E" />;
-              })}
-            </g>
-          );
-        })}
-        {T(W - 46, 245, "X8", { fs: 5.6 })}
-        <OrangePlug cx={W - 34.5} y0={251} n={2} pitch={16} nums={false} />
-        {T(W - 18, 264, "24V", { fs: 5.2, fw: 400 })}{T(W - 18, 280, "0V", { fs: 5.2, fw: 400 })}
-        {T(470, 300, "axis plugs drawn only — not modelled", { fs: 5.2, fw: 400, c: M.txtDim })}
-        <text x="14" y="320" fill="#2B2F33" fontSize="6.6" fontWeight="800" fontFamily="system-ui">BECKHOFF</text>
-        <text x="72" y="320" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
+        <rect x="0.5" y="0" width={W - 1} height={TH} rx="2" fill="#E3E5E7" stroke="#A9ADB1" strokeWidth="0.6" />
+        <rect x="18" y="10" width={W - 36} height={TH - 20} rx="2" fill="#CDD0D3" stroke="#A9ADB1" strokeWidth="0.5" />
+        {C4.map(([x, w, wide], ci) => [0, 1].map((row) => plug(x, row ? 183 : 26, w, row ? (ci === 1 ? 131 : 131) : 133, wide, `${ci}${row}`)))}
+        {C4.map(([x, w], ci) => (
+          <g key={`l${ci}`}>
+            {T(x + w / 2 - 22, 166, `X${ci * 2}`, { fs: 5.6 })}
+            {T(x + w / 2 - 22, 178, `X${ci * 2 + 1}`, { fs: 5.6 })}
+            {ci < 2 && T(x + w / 2 + 12, 166, ci ? "OUT" : "IN", { fs: 5.2 })}
+            {ci < 2 && T(x + w / 2 + 12, 178, ci ? "OUT" : "IN", { fs: 5.2 })}
+          </g>
+        ))}
+        {/* X8: orange 2-pin supply plug, openings side by side */}
+        {T(318, 271, "24V", { fs: 5.4, a: "middle" })}{T(352, 271, "0V", { fs: 5.4, a: "middle" })}
+        <rect x="306" y="276" width="62" height="50" rx="2" fill="#F2A21A" stroke="#B87708" strokeWidth="0.6" />
+        {[322, 352].map((cx) => (
+          <g key={cx}>
+            <circle cx={cx} cy={289} r="6.5" fill="#F7C35A" stroke="#C98A10" strokeWidth="0.5" />
+            <rect x={cx - 1} y={284} width="2" height="10" fill="#B87708" />
+            <rect x={cx - 7} y={302} width="14" height="16" rx="1.2" fill="#2E3134" />
+          </g>
+        ))}
+        {T(296, 322, "X8", { fs: 5.4, a: "end" })}
+        <text x="458" y="300" fill="#2B2F33" fontSize="14" fontWeight="800" fontFamily="system-ui" transform="rotate(-90 458 300)" style={{ letterSpacing: "0.5px" }}>BECKHOFF</text>
+        <text x="448" y="326" fill="#2B2F33" fontSize="6.4" fontWeight="700" fontFamily="ui-monospace,monospace">{d.id}</text>
       </g>
     );
   }
